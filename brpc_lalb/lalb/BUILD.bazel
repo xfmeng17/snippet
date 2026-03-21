@@ -1,0 +1,16 @@
+cc_library(
+    name = "lalb",
+    srcs = [
+        "weight.cc",
+        "weight_tree.cc",
+        "lalb.cc",
+    ],
+    hdrs = [
+        "weight.h",
+        "weight_tree.h",
+        "doubly_buffered_data.h",
+        "lalb.h",
+    ],
+    copts = ["-fno-exceptions"],
+    visibility = ["//visibility:public"],
+)
