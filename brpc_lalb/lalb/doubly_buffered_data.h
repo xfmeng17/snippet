@@ -48,9 +48,9 @@
 //    每个 DoublyBufferedData 实例分配一个唯一 key（类似 pthread_key_create），
 //    读取时通过 key 索引到自己的 Wrapper。
 //
-//    我们的简化方案：thread_local unordered_map<void*, shared_ptr<Wrapper>>，
+//    本项目的方案：thread_local unordered_map<void*, shared_ptr<Wrapper>>，
 //    以 this 指针作为 key。每次 Read 多一次 map lookup（O(1) 均摊），
-//    比 brpc 的数组索引慢一点，但逻辑清晰。
+//    比 brpc 的数组索引慢一点，但代码意图更直观，可读性更好。
 //
 // 6. 对比 brpc 原版
 //    - brpc 用 pthread TLS + WrapperTLSGroup（数组池）管理 per-instance Wrapper
@@ -258,8 +258,8 @@ DoublyBufferedData<T>::GetOrCreateWrapper() {
   // 每个 DoublyBufferedData 实例分配一个唯一 ID（类似 pthread_key_create），
   // 通过 ID 索引数组得到对应的 Wrapper。
   //
-  // 我们用更简单的方案：thread_local unordered_map，以 this 为 key。
-  // 每次 Read 多一次 hash lookup（O(1)），换来更简单的代码。
+  // 本项目用 thread_local unordered_map，以 this 为 key。
+  // 每次 Read 多一次 hash lookup（O(1)），换来更直观的代码可读性。
   // 在 Load Balancer 场景下，一个进程通常只有个位数的 DoublyBufferedData 实例，
   // 所以 map 很小，性能差异可以忽略。
   TlsMap& tls = GetTlsMap();

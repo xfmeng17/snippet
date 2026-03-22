@@ -184,9 +184,9 @@ brpc 的方案：WrapperTLSGroup
   - 优点：数组索引 O(1)，极快
   - 缺点：需要管理 key 的分配和回收
 
-我们的简化方案：thread_local unordered_map<this_ptr, Wrapper>
+本项目的方案：thread_local unordered_map<this_ptr, Wrapper>
   - 每次 Read: map[this] → 得到本实例的 Wrapper
-  - 优点：代码简单，无需管理 key
+  - 优点：代码意图直观，无需管理 key 的分配和回收
   - 缺点：hash lookup 比数组索引慢（但在实际场景中可忽略）
 
 析构时的陷阱：
@@ -657,6 +657,6 @@ total_weight_ = 1050
 | 权值计算 | Weight | Weight | 完全一致 |
 | 二叉树查找 | Servers::weight_tree | Servers::weight_tree | 完全一致 |
 | left_weight 存储 | `deque<int64_t>` + cast | `deque<atomic<int64_t>>` | 类型更安全 |
-| Weight 生命周期 | raw pointer + manual delete | shared_ptr | 简化内存管理 |
-| server map | FlatMap | unordered_map | 性能稍差，但标准库 |
-| 框架依赖 | Socket, ServerId, butil | 无依赖，纯 STL | 可独立编译运行 |
+| Weight 生命周期 | raw pointer + manual delete | shared_ptr | 所有权语义更清晰，避免手动 delete |
+| server map | FlatMap | unordered_map | 标准库，无额外依赖，接口一致 |
+| 框架依赖 | Socket, ServerId, butil | 无依赖，纯 STL | 可独立编译运行，降低阅读门槛 |
