@@ -50,12 +50,22 @@ Weight::Weight(int64_t initial_weight)
       base_weight_(initial_weight),
       inflight_sum_(0),
       inflight_count_(0),
+      old_diff_sum_(0),
+      old_index_(static_cast<size_t>(-1)),
+      old_weight_(0),
       avg_latency_(0),
       queue_head_(0),
       queue_tail_(0),
       queue_size_(0) {}
 
-int64_t Weight::ResetWeight(int64_t now_us) {
+// ============================================================
+// ResetWeight: 根据 base_weight 和 inflight delay 重算有效权值
+//
+// 这个函数是 MarkOld 机制的关键路径。
+// 当 old_index_ == index 时，说明当前 Weight 正在被 Remove 搬移，
+// 前台读线程仍在旧位置访问它，我们需要记录权值变化量。
+// ============================================================
+int64_t Weight::ResetWeight(size_t index, int64_t now_us) {
   int64_t new_weight = base_weight_;
 
   // inflight delay 惩罚
@@ -75,11 +85,23 @@ int64_t Weight::ResetWeight(int64_t now_us) {
 
   int64_t old_weight = weight_;
   weight_ = new_weight;
-  return new_weight - old_weight;
+  int64_t diff = new_weight - old_weight;
+
+  // ---- MarkOld 跟踪 ----
+  // 如果 old_index_ 等于当前 index，说明这个 Weight 正在被 Remove 搬移：
+  //   - 后台已经把它从旧位置（old_index_）搬到新位置
+  //   - 但前台还在旧位置访问它
+  //   - 前台的 Select/Feedback 调用 ResetWeight 时传入的 index 是旧位置
+  //   - 我们把这些 diff 累积起来，第二次 Modify 时通过 ClearOld 取走
+  if (old_index_ == index && diff != 0) {
+    old_diff_sum_ += diff;
+  }
+
+  return diff;
 }
 
 int64_t Weight::Update(int64_t latency_us, int64_t begin_time_us, bool error,
-                       int64_t timeout_ms) {
+                       int64_t timeout_ms, size_t index) {
   int64_t end_time_us = NowUs();
   int64_t latency = end_time_us - begin_time_us;
 
@@ -132,7 +154,6 @@ int64_t Weight::Update(int64_t latency_us, int64_t begin_time_us, bool error,
   int64_t scaled_qps = kDefaultQps * kWeightScale;
 
   if (end_time_us > top_time_us) {
-    // 队列满了或时间窗口足够大时才计算 QPS
     if (n == kQueueCapacity || end_time_us >= top_time_us + 1000000L) {
       scaled_qps = (int64_t)(n - 1) * 1000000L * kWeightScale /
                    (end_time_us - top_time_us);
@@ -156,16 +177,16 @@ int64_t Weight::Update(int64_t latency_us, int64_t begin_time_us, bool error,
   }
 
   base_weight_ = scaled_qps / avg_latency_;
-  return ResetWeight(end_time_us);
+  return ResetWeight(index, end_time_us);
 }
 
 Weight::AddInflightResult Weight::AddInflight(int64_t begin_time_us,
-                                              int64_t dice) {
+                                              size_t index, int64_t dice) {
   std::lock_guard<std::mutex> lock(mutex_);
   if (Disabled()) {
     return {false, 0};
   }
-  int64_t diff = ResetWeight(begin_time_us);
+  int64_t diff = ResetWeight(index, begin_time_us);
   if (weight_ < dice) {
     // inflight delay 惩罚使权值太低，不选这个节点
     return {false, diff};
@@ -175,13 +196,13 @@ Weight::AddInflightResult Weight::AddInflight(int64_t begin_time_us,
   return {true, diff};
 }
 
-int64_t Weight::MarkFailed(int64_t avg_weight) {
+int64_t Weight::MarkFailed(size_t index, int64_t avg_weight) {
   std::lock_guard<std::mutex> lock(mutex_);
   if (base_weight_ <= avg_weight) {
     return 0;
   }
   base_weight_ = avg_weight;
-  return ResetWeight(0);
+  return ResetWeight(index, 0);
 }
 
 int64_t Weight::Disable() {
@@ -190,6 +211,25 @@ int64_t Weight::Disable() {
   base_weight_ = -1;
   weight_ = 0;
   return saved;
+}
+
+int64_t Weight::MarkOld(size_t index) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  int64_t saved = weight_;
+  old_weight_ = saved;
+  old_diff_sum_ = 0;
+  old_index_ = index;
+  return saved;
+}
+
+std::pair<int64_t, int64_t> Weight::ClearOld() {
+  std::lock_guard<std::mutex> lock(mutex_);
+  int64_t old_weight = old_weight_;
+  int64_t diff = old_diff_sum_;
+  old_diff_sum_ = 0;
+  old_index_ = static_cast<size_t>(-1);
+  old_weight_ = 0;
+  return std::make_pair(old_weight, diff);
 }
 
 }  // namespace lalb

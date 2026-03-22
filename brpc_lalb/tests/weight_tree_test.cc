@@ -131,7 +131,6 @@ TEST(WeightTreeTest, SelectReturnsValidServer) {
 // ============================================================
 
 TEST(WeightTreeTest, SelectDistribution) {
-  // 3 个 server，等权值，选择分布应该大致均匀
   WeightTree tree;
   tree.AddServer(1, 10000);
   tree.AddServer(2, 10000);
@@ -147,8 +146,6 @@ TEST(WeightTreeTest, SelectDistribution) {
     }
   }
 
-  // 每个 server 应该被选中大约 1/3 的时间
-  // 允许较大误差（因为 inflight delay 会改变权值）
   for (const std::pair<const uint64_t, int>& kv : counts) {
     EXPECT_GT(kv.second, n / 10)
         << "Server " << kv.first << " selected too few times: " << kv.second;
@@ -169,7 +166,6 @@ TEST(WeightTreeTest, FeedbackUpdatesWeight) {
   WeightTree tree;
   tree.AddServer(1, Weight::kWeightScale);
 
-  // Select → Feedback 循环
   int64_t total = Weight::kWeightScale;
   for (int i = 0; i < 50; ++i) {
     int64_t begin = NowUs();
@@ -181,28 +177,23 @@ TEST(WeightTreeTest, FeedbackUpdatesWeight) {
       total += diff;
     }
   }
-  // 经过反馈，总权值应该有所变化（因为真实延时参与了计算）
-  // 不做精确断言，只验证不崩溃
 }
 
 // ============================================================
-// 接口测试：UpdateParentWeights
+// 接口测试：UpdateParentWeights 一致性
 // ============================================================
 
 TEST(WeightTreeTest, ParentWeightsConsistency) {
   WeightTree tree;
-  // 添加 7 个节点形成 3 层完全二叉树
   for (uint64_t i = 1; i <= 7; ++i) {
     tree.AddServer(i, 1000);
   }
   EXPECT_EQ(tree.Size(), 7u);
 
-  // 移除几个，验证不崩溃
   tree.RemoveServer(3);
   tree.RemoveServer(5);
   EXPECT_EQ(tree.Size(), 5u);
 
-  // 选择仍然正常
   for (int i = 0; i < 100; ++i) {
     WeightTree::SelectResult r = tree.Select(5000, NowUs());
     EXPECT_TRUE(r.success);
@@ -223,7 +214,6 @@ TEST(WeightTreeTest, ConcurrentSelectAndFeedback) {
   std::atomic<int> select_count{0};
   std::atomic<int> feedback_count{0};
 
-  // 多个线程并发 Select + Feedback
   std::function<void()> worker = [&]() {
     while (!stop.load()) {
       int64_t total = Weight::kWeightScale * 5;
@@ -262,7 +252,6 @@ TEST(WeightTreeTest, ConcurrentAddRemoveAndSelect) {
 
   std::atomic<bool> stop{false};
 
-  // 读线程：持续 Select
   std::function<void()> reader = [&]() {
     while (!stop.load()) {
       int64_t total = Weight::kWeightScale * 3;
@@ -270,7 +259,6 @@ TEST(WeightTreeTest, ConcurrentAddRemoveAndSelect) {
     }
   };
 
-  // 写线程：反复增删 server
   std::function<void()> writer = [&]() {
     uint64_t next_id = 100;
     while (!stop.load()) {
@@ -295,7 +283,6 @@ TEST(WeightTreeTest, ConcurrentAddRemoveAndSelect) {
   }
   write_thread.join();
 
-  // 验证结构完整性
   EXPECT_GE(tree.Size(), 3u);
 }
 

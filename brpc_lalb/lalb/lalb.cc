@@ -29,16 +29,9 @@ bool LALB::AddServer(uint64_t server_id) {
 }
 
 bool LALB::RemoveServer(uint64_t server_id) {
-  // RemoveServer 内部会更新 parent weights
-  // 这里需要更新 total_weight_
-  // 由于 Weight::Disable 返回旧权值，我们通过 tree_ 内部处理
   if (!tree_.RemoveServer(server_id)) {
     return false;
   }
-  // total_weight_ 会在 RemoveServer 内部通过 UpdateParentWeights 自动调整
-  // 但 total_weight_ 是外部维护的，需要在这里重新计算
-  // 简化处理：直接重新扫描（低频操作）
-  // 实际上 brpc 在 Remove 流程里精确维护 total，这里简化
   return true;
 }
 

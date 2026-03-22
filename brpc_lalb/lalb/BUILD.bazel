@@ -6,9 +6,9 @@ cc_library(
         "lalb.cc",
     ],
     hdrs = [
+        "doubly_buffered_data.h",
         "weight.h",
         "weight_tree.h",
-        "doubly_buffered_data.h",
         "lalb.h",
     ],
     copts = ["-fno-exceptions"],

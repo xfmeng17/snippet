@@ -1,4 +1,14 @@
 cc_test(
+    name = "dbd_test",
+    srcs = ["dbd_test.cc"],
+    copts = ["-fno-exceptions"],
+    deps = [
+        "//lalb",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
     name = "weight_test",
     srcs = ["weight_test.cc"],
     copts = ["-fno-exceptions"],

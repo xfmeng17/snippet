@@ -1,6 +1,6 @@
 // ============================================================
 // Weight 单元测试
-// 测试权值计算器的各种行为
+// 测试权值计算器的各种行为，包括 MarkOld/ClearOld 机制
 // ============================================================
 
 #include "lalb/weight.h"
@@ -54,7 +54,6 @@ TEST(WeightTest, DoubleDisable) {
   Weight w(5000);
   w.Disable();
   int64_t old = w.Disable();
-  // 已经 disabled，weight 已经是 0
   EXPECT_EQ(old, 0);
   EXPECT_TRUE(w.Disabled());
 }
@@ -66,15 +65,14 @@ TEST(WeightTest, DoubleDisable) {
 TEST(WeightTest, AddInflightBasic) {
   Weight w(10000);
   int64_t now = NowUs();
-  Weight::AddInflightResult r = w.AddInflight(now, 5000);
+  Weight::AddInflightResult r = w.AddInflight(now, 0, 5000);
   EXPECT_TRUE(r.chosen);
 }
 
 TEST(WeightTest, AddInflightDiceTooLarge) {
   Weight w(100);
   int64_t now = NowUs();
-  // dice > kMinWeight（ResetWeight 会把权值拉到 kMinWeight）
-  Weight::AddInflightResult r = w.AddInflight(now, Weight::kMinWeight + 1);
+  Weight::AddInflightResult r = w.AddInflight(now, 0, Weight::kMinWeight + 1);
   EXPECT_FALSE(r.chosen);
 }
 
@@ -82,7 +80,7 @@ TEST(WeightTest, AddInflightDisabledNode) {
   Weight w(10000);
   w.Disable();
   int64_t now = NowUs();
-  Weight::AddInflightResult r = w.AddInflight(now, 0);
+  Weight::AddInflightResult r = w.AddInflight(now, 0, 0);
   EXPECT_FALSE(r.chosen);
   EXPECT_EQ(r.weight_diff, 0);
 }
@@ -93,16 +91,13 @@ TEST(WeightTest, AddInflightDisabledNode) {
 
 TEST(WeightTest, MarkFailedReducesWeight) {
   Weight w(10000);
-  int64_t diff = w.MarkFailed(2000);
-  // base_weight 应该被降到 avg_weight=2000
-  // 然后 ResetWeight 重算 → 新权值取 max(2000, kMinWeight)
-  EXPECT_LE(diff, 0);  // 权值应该下降
+  int64_t diff = w.MarkFailed(0, 2000);
+  EXPECT_LE(diff, 0);
 }
 
 TEST(WeightTest, MarkFailedNoEffectIfAlreadyLow) {
   Weight w(500);
-  int64_t diff = w.MarkFailed(2000);
-  // base_weight(500) <= avg_weight(2000)，不做任何事
+  int64_t diff = w.MarkFailed(0, 2000);
   EXPECT_EQ(diff, 0);
 }
 
@@ -114,18 +109,13 @@ TEST(WeightTest, UpdateWithNormalRequest) {
   Weight w(Weight::kWeightScale);
   int64_t now = NowUs();
 
-  // 模拟一次 inflight
-  Weight::AddInflightResult r = w.AddInflight(now, 0);
+  Weight::AddInflightResult r = w.AddInflight(now, 0, 0);
   EXPECT_TRUE(r.chosen);
 
-  // 等待一小段时间模拟延时
   std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
-  // 反馈正常结果
-  int64_t latency = 1000;  // 1ms
-  w.Update(latency, now, /*error=*/false, /*timeout_ms=*/0);
-
-  // 权值应该被更新
+  int64_t latency = 1000;
+  w.Update(latency, now, false, 0, 0);
   EXPECT_GT(w.volatile_value(), 0);
 }
 
@@ -133,7 +123,7 @@ TEST(WeightTest, UpdateDisabledNodeIsNoop) {
   Weight w(10000);
   w.Disable();
   int64_t now = NowUs();
-  int64_t diff = w.Update(1000, now, false, 0);
+  int64_t diff = w.Update(1000, now, false, 0, 0);
   EXPECT_EQ(diff, 0);
 }
 
@@ -141,15 +131,11 @@ TEST(WeightTest, UpdateWithError) {
   Weight w(Weight::kWeightScale);
   int64_t now = NowUs();
 
-  Weight::AddInflightResult r = w.AddInflight(now, 0);
+  Weight::AddInflightResult r = w.AddInflight(now, 0, 0);
   EXPECT_TRUE(r.chosen);
 
   std::this_thread::sleep_for(std::chrono::milliseconds(1));
-
-  // 反馈错误结果
-  w.Update(1000, now, /*error=*/true, /*timeout_ms=*/100);
-
-  // 权值应该仍然有效（最小值保护）
+  w.Update(1000, now, true, 100, 0);
   EXPECT_GE(w.volatile_value(), Weight::kMinWeight);
 }
 
@@ -160,17 +146,15 @@ TEST(WeightTest, UpdateWithError) {
 TEST(WeightTest, MultipleUpdatesConverge) {
   Weight w(Weight::kWeightScale);
 
-  // 模拟多次 RPC 反馈，延时固定 1ms
   for (int i = 0; i < 200; ++i) {
     int64_t now = NowUs();
-    Weight::AddInflightResult r = w.AddInflight(now, 0);
+    Weight::AddInflightResult r = w.AddInflight(now, 0, 0);
     if (!r.chosen) continue;
 
     std::this_thread::sleep_for(std::chrono::microseconds(100));
-    w.Update(1000, now, false, 0);
+    w.Update(1000, now, false, 0, 0);
   }
 
-  // 经过足够多的更新，权值应该稳定到一个正值
   EXPECT_GT(w.volatile_value(), 0);
   EXPECT_GT(w.avg_latency(), 0);
 }
@@ -183,14 +167,122 @@ TEST(WeightTest, MinWeightProtection) {
   Weight w(Weight::kMinWeight);
 
   int64_t now = NowUs();
-  Weight::AddInflightResult r = w.AddInflight(now, 0);
+  Weight::AddInflightResult r = w.AddInflight(now, 0, 0);
   if (r.chosen) {
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
-    w.Update(1000000, now, false, 0);  // 非常高的延时
+    w.Update(1000000, now, false, 0, 0);
   }
 
-  // 即使延时很高，权值也不会低于 kMinWeight
   EXPECT_GE(w.volatile_value(), Weight::kMinWeight);
+}
+
+// ============================================================
+// 单元测试：MarkOld / ClearOld
+//
+// 测试 Remove 时的双缓冲权值追踪机制
+// ============================================================
+
+TEST(WeightTest, MarkOldClearOldBasic) {
+  Weight w(5000);
+
+  // MarkOld: 记住当前权值和位置
+  int64_t marked = w.MarkOld(3);
+  EXPECT_EQ(marked, 5000);
+
+  // ClearOld: 没有权值变化，diff 应该为 0
+  std::pair<int64_t, int64_t> p = w.ClearOld();
+  EXPECT_EQ(p.first, 5000);   // old_weight
+  EXPECT_EQ(p.second, 0);     // accumulated_diff
+}
+
+TEST(WeightTest, MarkOldTracksDiffAtOldIndex) {
+  // 模拟场景：
+  // 1. Weight 初始权值 kWeightScale
+  // 2. MarkOld(index=5) → 开始追踪
+  // 3. 多次 AddInflight + Update → 权值变化，ResetWeight 在 index=5 被调用
+  // 4. ClearOld → 获取累积的 diff
+  Weight w(Weight::kWeightScale);
+
+  // 先建立一些统计数据
+  for (int i = 0; i < 50; ++i) {
+    int64_t now = NowUs();
+    Weight::AddInflightResult r = w.AddInflight(now, 5, 0);
+    if (r.chosen) {
+      std::this_thread::sleep_for(std::chrono::microseconds(100));
+      w.Update(1000, now, false, 0, 5);
+    }
+  }
+
+  int64_t weight_before_mark = w.volatile_value();
+
+  // MarkOld: 开始追踪 index=5 上的变化
+  int64_t marked = w.MarkOld(5);
+  EXPECT_EQ(marked, weight_before_mark);
+
+  // 继续一些请求，权值会因 inflight delay 变化
+  int64_t expected_diff = 0;
+  for (int i = 0; i < 20; ++i) {
+    int64_t now = NowUs();
+    // AddInflight 在 index=5 会调用 ResetWeight(5, now)
+    Weight::AddInflightResult r = w.AddInflight(now, 5, 0);
+    expected_diff += r.weight_diff;
+    if (r.chosen) {
+      std::this_thread::sleep_for(std::chrono::microseconds(50));
+      int64_t diff = w.Update(1000, now, false, 0, 5);
+      expected_diff += diff;
+    }
+  }
+
+  // ClearOld: 应该能拿到累积的 diff
+  std::pair<int64_t, int64_t> p = w.ClearOld();
+  EXPECT_EQ(p.first, weight_before_mark);  // old_weight
+  EXPECT_EQ(p.second, expected_diff);       // accumulated_diff
+}
+
+TEST(WeightTest, MarkOldIgnoresDiffAtDifferentIndex) {
+  // MarkOld(index=5)，但 ResetWeight 在 index=3 被调用
+  // → diff 不应该被追踪
+  Weight w(Weight::kWeightScale);
+
+  // 建立统计数据
+  for (int i = 0; i < 50; ++i) {
+    int64_t now = NowUs();
+    Weight::AddInflightResult r = w.AddInflight(now, 3, 0);
+    if (r.chosen) {
+      std::this_thread::sleep_for(std::chrono::microseconds(100));
+      w.Update(1000, now, false, 0, 3);
+    }
+  }
+
+  // MarkOld 在 index=5
+  w.MarkOld(5);
+
+  // 继续请求，但 index=3（不是 old_index）
+  for (int i = 0; i < 10; ++i) {
+    int64_t now = NowUs();
+    Weight::AddInflightResult r = w.AddInflight(now, 3, 0);
+    if (r.chosen) {
+      std::this_thread::sleep_for(std::chrono::microseconds(50));
+      w.Update(1000, now, false, 0, 3);
+    }
+  }
+
+  // ClearOld: diff 应该为 0（没有在 index=5 上的变化）
+  std::pair<int64_t, int64_t> p = w.ClearOld();
+  EXPECT_EQ(p.second, 0);
+}
+
+TEST(WeightTest, ClearOldResetsState) {
+  Weight w(5000);
+
+  w.MarkOld(3);
+  std::pair<int64_t, int64_t> p1 = w.ClearOld();
+  EXPECT_EQ(p1.first, 5000);
+
+  // ClearOld 后再 ClearOld 应该返回 0
+  std::pair<int64_t, int64_t> p2 = w.ClearOld();
+  EXPECT_EQ(p2.first, 0);
+  EXPECT_EQ(p2.second, 0);
 }
 
 }  // namespace
