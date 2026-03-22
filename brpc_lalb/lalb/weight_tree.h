@@ -85,18 +85,37 @@ class WeightTree {
  public:
   WeightTree() = default;
 
-  // 返回实际分配的初始权值，0 表示失败（重复 id）
+  // 禁止拷贝/移动（含 DoublyBufferedData 和 deque<atomic>，不可拷贝）
+  WeightTree(const WeightTree&) = delete;
+  WeightTree& operator=(const WeightTree&) = delete;
+
+  // 添加 server。
+  // 返回实际分配的初始权值（> 0），重复 id 返回 0。
+  // 初始权值 = 已有节点的平均权值，无已有节点时为 kWeightScale。
+  // 线程安全：内部通过 DoublyBufferedData::ModifyWithForeground 串行化。
   int64_t AddServer(uint64_t server_id);
-  // 返回被移除节点的权值，0 表示失败（id 不存在）
+
+  // 移除 server。
+  // 返回被移除节点的权值（> 0），id 不存在返回 0。
+  // 线程安全：内部通过 DoublyBufferedData::Modify 串行化。
   int64_t RemoveServer(uint64_t server_id);
 
   struct SelectResult {
-    uint64_t server_id;
-    int64_t weight_diff;
-    bool success;
+    uint64_t server_id;   // 选中的 server（success=false 时无意义）
+    int64_t weight_diff;  // Select 过程中产生的累积权值变化，调用方需更新 total_weight
+    bool success;         // 是否成功选中
   };
+
+  // 按权值随机选择一个 server。
+  // total_weight: 调用方维护的全局权值总和（用于生成 dice 范围）
+  // begin_time_us: 当前时间戳（微秒），会记入 Weight 的 inflight 追踪
+  // 线程安全：多线程可并发调用，内部通过 thread-local 锁保护。
   SelectResult Select(int64_t total_weight, int64_t begin_time_us);
 
+  // 反馈 RPC 结果，更新对应 server 的权值。
+  // 返回权值变化量（diff），调用方需将 diff 加到 total_weight 上。
+  // server_id 不存在时返回 0（不报错，因为 Remove 可能在 RPC 期间发生）。
+  // 线程安全：多线程可并发调用。
   int64_t Feedback(uint64_t server_id, int64_t latency_us,
                    int64_t begin_time_us, bool error, int64_t timeout_ms);
 
