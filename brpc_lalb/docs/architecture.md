@@ -25,9 +25,9 @@ LocalityAwareLoadBalancer                LALB
 │   ├── WrapperTLSGroup (数组池 TLS)    thread_local unordered_map (per-instance TLS)
 │   └── Wrapper (per-thread mutex)       Wrapper (per-thread mutex)
 ├── _total (atomic)                      total_weight_ (atomic)
-├── _left_weights (deque<int64_t>)       left_weights_ (deque<atomic<int64_t>>)
-├── Add(bg, fg, id, lb) [static]         Add(bg, fg, id, self) [static]
-├── Remove(bg, id, lb) [static]          Remove(bg, id, self) [static]
+├── _left_weights (deque<int64_t>)       left_weights_ (deque<atomic<int64_t>>) [在 WeightTree 中]
+├── Add(bg, fg, id, lb) [static]         Add(bg, fg, id, self, out_weight) [static]
+├── Remove(bg, id, lb) [static]          Remove(bg, id, self, out_weight) [static]
 ├── SelectServer()                       Select()
 ├── Feedback()                           Feedback()
 └── ServerId → SocketId mapping          直接用 uint64_t server_id
@@ -47,7 +47,7 @@ LALB
       │    │    ├── weight_tree[0..N-1]  (TreeNode vector)
       │    │    └── server_map           (id → index)
       │    ├── data_[1] (后台 Servers)
-      │    │    └── (和前台结构相同，TreeNode 中的 Weight* 共享)
+      │    │    └── (和前台结构相同，TreeNode 中的 shared_ptr<Weight> 共享)
       │    ├── index_ (atomic, 标识哪个是前台)
       │    ├── wrappers_[] (所有线程的 Wrapper 弱引用)
       │    ├── modify_mutex_ (串行化写操作)
