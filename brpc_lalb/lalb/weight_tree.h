@@ -85,8 +85,10 @@ class WeightTree {
  public:
   WeightTree() = default;
 
-  bool AddServer(uint64_t server_id, int64_t initial_weight);
-  bool RemoveServer(uint64_t server_id);
+  // 返回实际分配的初始权值，0 表示失败（重复 id）
+  int64_t AddServer(uint64_t server_id);
+  // 返回被移除节点的权值，0 表示失败（id 不存在）
+  int64_t RemoveServer(uint64_t server_id);
 
   struct SelectResult {
     uint64_t server_id;
@@ -108,14 +110,17 @@ class WeightTree {
   // Add: 需要前台参考（ModifyWithForeground）
   // 第一次调用: fg 中没有 id → 创建新 Weight 和 left_weight
   // 第二次调用: fg 中有 id → 复制指针（不重复创建）
+  // out_weight: 第一次调用时写入实际分配的初始权值
   static bool Add(Servers& bg, const Servers& fg, uint64_t server_id,
-                  WeightTree* self);
+                  WeightTree* self, int64_t* out_weight);
 
   // Remove: 不需要前台参考，但需要区分第一次/第二次
   // 通过 Weight::Disable() 的返回值区分：
   //   > 0: 第一次（后台）→ MarkOld
   //   = 0: 第二次（新后台）→ ClearOld + 清理资源
-  static bool Remove(Servers& bg, uint64_t server_id, WeightTree* self);
+  // out_weight: 第一次调用时写入被移除节点的权值
+  static bool Remove(Servers& bg, uint64_t server_id, WeightTree* self,
+                     int64_t* out_weight);
 
   // ---- left_weight 管理 ----
   // 用 deque 保证指针稳定（vector resize 会导致指针失效）

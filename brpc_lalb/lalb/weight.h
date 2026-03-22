@@ -70,8 +70,8 @@ class Weight {
 
   // 反馈 RPC 结果，更新权值。返回权值变化量（diff）
   // index: 该 Weight 在 weight_tree 中的位置（用于 MarkOld 跟踪）
-  int64_t Update(int64_t latency_us, int64_t begin_time_us, bool error,
-                 int64_t timeout_ms, size_t index);
+  int64_t Update(int64_t begin_time_us, bool error, int64_t timeout_ms,
+                 size_t index);
 
   // 选择 server 时调用：记录 inflight 并重算权值
   struct AddInflightResult {

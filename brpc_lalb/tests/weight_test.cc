@@ -114,8 +114,7 @@ TEST(WeightTest, UpdateWithNormalRequest) {
 
   std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
-  int64_t latency = 1000;
-  w.Update(latency, now, false, 0, 0);
+  w.Update(now, false, 0, 0);
   EXPECT_GT(w.volatile_value(), 0);
 }
 
@@ -123,7 +122,7 @@ TEST(WeightTest, UpdateDisabledNodeIsNoop) {
   Weight w(10000);
   w.Disable();
   int64_t now = NowUs();
-  int64_t diff = w.Update(1000, now, false, 0, 0);
+  int64_t diff = w.Update(now, false, 0, 0);
   EXPECT_EQ(diff, 0);
 }
 
@@ -135,7 +134,7 @@ TEST(WeightTest, UpdateWithError) {
   EXPECT_TRUE(r.chosen);
 
   std::this_thread::sleep_for(std::chrono::milliseconds(1));
-  w.Update(1000, now, true, 100, 0);
+  w.Update(now, true, 100, 0);
   EXPECT_GE(w.volatile_value(), Weight::kMinWeight);
 }
 
@@ -152,7 +151,7 @@ TEST(WeightTest, MultipleUpdatesConverge) {
     if (!r.chosen) continue;
 
     std::this_thread::sleep_for(std::chrono::microseconds(100));
-    w.Update(1000, now, false, 0, 0);
+    w.Update(now, false, 0, 0);
   }
 
   EXPECT_GT(w.volatile_value(), 0);
@@ -170,7 +169,7 @@ TEST(WeightTest, MinWeightProtection) {
   Weight::AddInflightResult r = w.AddInflight(now, 0, 0);
   if (r.chosen) {
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
-    w.Update(1000000, now, false, 0, 0);
+    w.Update(now, false, 0, 0);
   }
 
   EXPECT_GE(w.volatile_value(), Weight::kMinWeight);
@@ -209,7 +208,7 @@ TEST(WeightTest, MarkOldTracksDiffAtOldIndex) {
     Weight::AddInflightResult r = w.AddInflight(now, 5, 0);
     if (r.chosen) {
       std::this_thread::sleep_for(std::chrono::microseconds(100));
-      w.Update(1000, now, false, 0, 5);
+      w.Update(now, false, 0, 5);
     }
   }
 
@@ -228,7 +227,7 @@ TEST(WeightTest, MarkOldTracksDiffAtOldIndex) {
     expected_diff += r.weight_diff;
     if (r.chosen) {
       std::this_thread::sleep_for(std::chrono::microseconds(50));
-      int64_t diff = w.Update(1000, now, false, 0, 5);
+      int64_t diff = w.Update(now, false, 0, 5);
       expected_diff += diff;
     }
   }
@@ -250,7 +249,7 @@ TEST(WeightTest, MarkOldIgnoresDiffAtDifferentIndex) {
     Weight::AddInflightResult r = w.AddInflight(now, 3, 0);
     if (r.chosen) {
       std::this_thread::sleep_for(std::chrono::microseconds(100));
-      w.Update(1000, now, false, 0, 3);
+      w.Update(now, false, 0, 3);
     }
   }
 
@@ -263,7 +262,7 @@ TEST(WeightTest, MarkOldIgnoresDiffAtDifferentIndex) {
     Weight::AddInflightResult r = w.AddInflight(now, 3, 0);
     if (r.chosen) {
       std::this_thread::sleep_for(std::chrono::microseconds(50));
-      w.Update(1000, now, false, 0, 3);
+      w.Update(now, false, 0, 3);
     }
   }
 

@@ -100,8 +100,8 @@ int64_t Weight::ResetWeight(size_t index, int64_t now_us) {
   return diff;
 }
 
-int64_t Weight::Update(int64_t latency_us, int64_t begin_time_us, bool error,
-                       int64_t timeout_ms, size_t index) {
+int64_t Weight::Update(int64_t begin_time_us, bool error, int64_t timeout_ms,
+                       size_t index) {
   int64_t end_time_us = NowUs();
   int64_t latency = end_time_us - begin_time_us;
 

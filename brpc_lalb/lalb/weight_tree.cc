@@ -69,7 +69,7 @@ void WeightTree::PopLeft() { left_weights_.pop_back(); }
 // 通过检查 fg 中是否已有 id，第二次调用可以直接复制指针。
 // ============================================================
 bool WeightTree::Add(Servers& bg, const Servers& fg, uint64_t server_id,
-                     WeightTree* self) {
+                     WeightTree* self, int64_t* out_weight) {
   if (bg.server_map.count(server_id)) {
     return false;  // 重复
   }
@@ -107,6 +107,8 @@ bool WeightTree::Add(Servers& bg, const Servers& fg, uint64_t server_id,
     if (w > 0) {
       bg.UpdateParentWeights(w, index);
     }
+    // 记录实际分配的权值（仅第一次调用时写入）
+    *out_weight = w;
   } else {
     // ---- 第二次调用：从前台复制 ----
     bg.server_map[server_id] = bg.weight_tree.size();
@@ -150,7 +152,8 @@ bool WeightTree::Add(Servers& bg, const Servers& fg, uint64_t server_id,
 //   6. 更新 total_weight: -old_weight
 //   7. 释放资源（被删节点的 Weight，末尾位置的 left_weight）
 // ============================================================
-bool WeightTree::Remove(Servers& bg, uint64_t server_id, WeightTree* self) {
+bool WeightTree::Remove(Servers& bg, uint64_t server_id, WeightTree* self,
+                        int64_t* out_weight) {
   std::unordered_map<uint64_t, size_t>::iterator it =
       bg.server_map.find(server_id);
   if (it == bg.server_map.end()) {
@@ -162,6 +165,11 @@ bool WeightTree::Remove(Servers& bg, uint64_t server_id, WeightTree* self) {
 
   std::shared_ptr<Weight> w = bg.weight_tree[index].weight;
   int64_t rm_weight = w->Disable();
+
+  // 第一次调用时记录被移除节点的权值
+  if (rm_weight > 0) {
+    *out_weight = rm_weight;
+  }
 
   if (index + 1 == bg.weight_tree.size()) {
     // ---- 简单情况：删除末尾节点 ----
@@ -231,17 +239,23 @@ bool WeightTree::Remove(Servers& bg, uint64_t server_id, WeightTree* self) {
 // AddServer / RemoveServer: 公开接口
 // ============================================================
 
-bool WeightTree::AddServer(uint64_t server_id, int64_t initial_weight) {
-  return db_servers_.ModifyWithForeground(
-      [server_id, this](Servers& bg, const Servers& fg) -> bool {
-        return Add(bg, fg, server_id, this);
+int64_t WeightTree::AddServer(uint64_t server_id) {
+  int64_t assigned_weight = 0;
+  bool ok = db_servers_.ModifyWithForeground(
+      [server_id, this, &assigned_weight](Servers& bg,
+                                          const Servers& fg) -> bool {
+        return Add(bg, fg, server_id, this, &assigned_weight);
       });
+  return ok ? assigned_weight : 0;
 }
 
-bool WeightTree::RemoveServer(uint64_t server_id) {
-  return db_servers_.Modify([server_id, this](Servers& bg) -> bool {
-    return Remove(bg, server_id, this);
-  });
+int64_t WeightTree::RemoveServer(uint64_t server_id) {
+  int64_t removed_weight = 0;
+  bool ok = db_servers_.Modify(
+      [server_id, this, &removed_weight](Servers& bg) -> bool {
+        return Remove(bg, server_id, this, &removed_weight);
+      });
+  return ok ? removed_weight : 0;
 }
 
 // ============================================================
@@ -357,7 +371,7 @@ int64_t WeightTree::Feedback(uint64_t server_id, int64_t latency_us,
   }
   size_t index = it->second;
   int64_t diff = s->weight_tree[index].weight->Update(
-      latency_us, begin_time_us, error, timeout_ms, index);
+      begin_time_us, error, timeout_ms, index);
   if (diff != 0) {
     s->UpdateParentWeights(diff, index);
   }

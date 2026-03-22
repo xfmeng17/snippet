@@ -34,62 +34,62 @@ TEST(WeightTreeTest, Empty) {
 
 TEST(WeightTreeTest, AddOne) {
   WeightTree tree;
-  EXPECT_TRUE(tree.AddServer(1, Weight::kWeightScale));
+  EXPECT_GT(tree.AddServer(1), 0);
   EXPECT_EQ(tree.Size(), 1u);
 }
 
 TEST(WeightTreeTest, AddDuplicate) {
   WeightTree tree;
-  EXPECT_TRUE(tree.AddServer(1, 1000));
-  EXPECT_FALSE(tree.AddServer(1, 1000));
+  EXPECT_GT(tree.AddServer(1), 0);
+  EXPECT_EQ(tree.AddServer(1), 0);
   EXPECT_EQ(tree.Size(), 1u);
 }
 
 TEST(WeightTreeTest, AddMultiple) {
   WeightTree tree;
   for (uint64_t i = 1; i <= 10; ++i) {
-    EXPECT_TRUE(tree.AddServer(i, Weight::kWeightScale));
+    EXPECT_GT(tree.AddServer(i), 0);
   }
   EXPECT_EQ(tree.Size(), 10u);
 }
 
 TEST(WeightTreeTest, RemoveOne) {
   WeightTree tree;
-  tree.AddServer(1, 1000);
-  EXPECT_TRUE(tree.RemoveServer(1));
+  tree.AddServer(1);
+  EXPECT_GT(tree.RemoveServer(1), 0);
   EXPECT_EQ(tree.Size(), 0u);
 }
 
 TEST(WeightTreeTest, RemoveNonExistent) {
   WeightTree tree;
-  EXPECT_FALSE(tree.RemoveServer(999));
+  EXPECT_EQ(tree.RemoveServer(999), 0);
 }
 
 TEST(WeightTreeTest, RemoveMiddle) {
   WeightTree tree;
-  tree.AddServer(1, 1000);
-  tree.AddServer(2, 1000);
-  tree.AddServer(3, 1000);
-  EXPECT_TRUE(tree.RemoveServer(2));
+  tree.AddServer(1);
+  tree.AddServer(2);
+  tree.AddServer(3);
+  EXPECT_GT(tree.RemoveServer(2), 0);
   EXPECT_EQ(tree.Size(), 2u);
 }
 
 TEST(WeightTreeTest, RemoveAll) {
   WeightTree tree;
   for (uint64_t i = 1; i <= 5; ++i) {
-    tree.AddServer(i, 1000);
+    tree.AddServer(i);
   }
   for (uint64_t i = 1; i <= 5; ++i) {
-    EXPECT_TRUE(tree.RemoveServer(i));
+    EXPECT_GT(tree.RemoveServer(i), 0);
   }
   EXPECT_EQ(tree.Size(), 0u);
 }
 
 TEST(WeightTreeTest, AddAfterRemove) {
   WeightTree tree;
-  tree.AddServer(1, 1000);
+  tree.AddServer(1);
   tree.RemoveServer(1);
-  EXPECT_TRUE(tree.AddServer(1, 2000));
+  EXPECT_GT(tree.AddServer(1), 0);
   EXPECT_EQ(tree.Size(), 1u);
 }
 
@@ -105,8 +105,8 @@ TEST(WeightTreeTest, SelectFromEmpty) {
 
 TEST(WeightTreeTest, SelectFromSingle) {
   WeightTree tree;
-  tree.AddServer(42, Weight::kWeightScale);
-  WeightTree::SelectResult r = tree.Select(Weight::kWeightScale, NowUs());
+  int64_t w = tree.AddServer(42);
+  WeightTree::SelectResult r = tree.Select(w, NowUs());
   EXPECT_TRUE(r.success);
   EXPECT_EQ(r.server_id, 42u);
 }
@@ -114,10 +114,10 @@ TEST(WeightTreeTest, SelectFromSingle) {
 TEST(WeightTreeTest, SelectReturnsValidServer) {
   WeightTree tree;
   std::set<uint64_t> ids = {1, 2, 3, 4, 5};
+  int64_t total = 0;
   for (uint64_t id : ids) {
-    tree.AddServer(id, Weight::kWeightScale);
+    total += tree.AddServer(id);
   }
-  int64_t total = Weight::kWeightScale * 5;
   for (int i = 0; i < 100; ++i) {
     WeightTree::SelectResult r = tree.Select(total, NowUs());
     EXPECT_TRUE(r.success);
@@ -132,12 +132,12 @@ TEST(WeightTreeTest, SelectReturnsValidServer) {
 
 TEST(WeightTreeTest, SelectDistribution) {
   WeightTree tree;
-  tree.AddServer(1, 10000);
-  tree.AddServer(2, 10000);
-  tree.AddServer(3, 10000);
+  int64_t total = 0;
+  total += tree.AddServer(1);
+  total += tree.AddServer(2);
+  total += tree.AddServer(3);
 
   std::unordered_map<uint64_t, int> counts;
-  int64_t total = 30000;
   int n = 3000;
   for (int i = 0; i < n; ++i) {
     WeightTree::SelectResult r = tree.Select(total, NowUs());
@@ -164,9 +164,7 @@ TEST(WeightTreeTest, FeedbackNonExistent) {
 
 TEST(WeightTreeTest, FeedbackUpdatesWeight) {
   WeightTree tree;
-  tree.AddServer(1, Weight::kWeightScale);
-
-  int64_t total = Weight::kWeightScale;
+  int64_t total = tree.AddServer(1);
   for (int i = 0; i < 50; ++i) {
     int64_t begin = NowUs();
     WeightTree::SelectResult r = tree.Select(total, begin);
@@ -186,7 +184,7 @@ TEST(WeightTreeTest, FeedbackUpdatesWeight) {
 TEST(WeightTreeTest, ParentWeightsConsistency) {
   WeightTree tree;
   for (uint64_t i = 1; i <= 7; ++i) {
-    tree.AddServer(i, 1000);
+    tree.AddServer(i);
   }
   EXPECT_EQ(tree.Size(), 7u);
 
@@ -207,7 +205,7 @@ TEST(WeightTreeTest, ParentWeightsConsistency) {
 TEST(WeightTreeTest, ConcurrentSelectAndFeedback) {
   WeightTree tree;
   for (uint64_t i = 1; i <= 5; ++i) {
-    tree.AddServer(i, Weight::kWeightScale);
+    tree.AddServer(i);
   }
 
   std::atomic<bool> stop{false};
@@ -247,7 +245,7 @@ TEST(WeightTreeTest, ConcurrentSelectAndFeedback) {
 TEST(WeightTreeTest, ConcurrentAddRemoveAndSelect) {
   WeightTree tree;
   for (uint64_t i = 1; i <= 3; ++i) {
-    tree.AddServer(i, Weight::kWeightScale);
+    tree.AddServer(i);
   }
 
   std::atomic<bool> stop{false};
@@ -262,7 +260,7 @@ TEST(WeightTreeTest, ConcurrentAddRemoveAndSelect) {
   std::function<void()> writer = [&]() {
     uint64_t next_id = 100;
     while (!stop.load()) {
-      tree.AddServer(next_id, Weight::kWeightScale);
+      tree.AddServer(next_id);
       std::this_thread::sleep_for(std::chrono::microseconds(500));
       tree.RemoveServer(next_id);
       ++next_id;

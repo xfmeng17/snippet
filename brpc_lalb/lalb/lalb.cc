@@ -12,26 +12,20 @@ static int64_t NowUs() {
 }
 
 bool LALB::AddServer(uint64_t server_id) {
-  int64_t initial_weight = Weight::kWeightScale;
-  size_t n = tree_.Size();
-  if (n > 0) {
-    int64_t total = total_weight_.load(std::memory_order_relaxed);
-    initial_weight = total / static_cast<int64_t>(n);
-    if (initial_weight < Weight::kMinWeight) {
-      initial_weight = Weight::kWeightScale;
-    }
-  }
-  if (!tree_.AddServer(server_id, initial_weight)) {
+  int64_t weight = tree_.AddServer(server_id);
+  if (weight <= 0) {
     return false;
   }
-  total_weight_.fetch_add(initial_weight, std::memory_order_relaxed);
+  total_weight_.fetch_add(weight, std::memory_order_relaxed);
   return true;
 }
 
 bool LALB::RemoveServer(uint64_t server_id) {
-  if (!tree_.RemoveServer(server_id)) {
+  int64_t weight = tree_.RemoveServer(server_id);
+  if (weight <= 0) {
     return false;
   }
+  total_weight_.fetch_sub(weight, std::memory_order_relaxed);
   return true;
 }
 
