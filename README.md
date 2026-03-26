@@ -16,7 +16,10 @@
 | 目录 | 类型 | 主题 | 说明 |
 |------|------|------|------|
 | [brpc_lalb](brpc_lalb/) | 代码重写 | Locality-Aware Load Balancing | 源自 [Apache brpc](https://github.com/apache/brpc)，Bazel, C++17 |
+| [concurrent_hashmap](concurrent_hashmap/) | 技术调研 | C++ 并发 HashMap | 业界主流方案对比：读 wait-free + 写分片锁 到 完全 lock-free |
 | [zenmux](zenmux/) | 技术调研 | ZenMux LLM API 代理商 | 收费方式详解（订阅 Flow 机制、PAYG、Claude API 计费对比） |
+| [ccuse](ccuse/) | 工具 | Claude Code Provider 切换器 | 30 行 shell 函数，零依赖秒切 provider，替代 cc-switch |
+| [claude](claude/) | 工具 | Claude Code 自定义 Skills | learn-project、cpp-style-check、dev-init、gcp 等自定义技能 |
 
 ## brpc_lalb
 

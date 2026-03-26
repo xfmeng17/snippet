@@ -1,0 +1,15 @@
+{
+  "env": {
+    "ANTHROPIC_AUTH_TOKEN": "<YOUR_ZENMUX_API_KEY>",
+    "ANTHROPIC_BASE_URL": "https://zenmux.ai/api/anthropic",
+    "ANTHROPIC_MODEL": "anthropic/claude-opus-4.6",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "anthropic/claude-haiku-4.5",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "anthropic/claude-opus-4.6",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "anthropic/claude-sonnet-4.6",
+    "CLAUDE_CODE_ATTRIBUTION_HEADER": "0",
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
+    "CCUSE_PROVIDER": "zenmux"
+  },
+  "model": "anthropic/claude-opus-4.6",
+  "skipWebFetchPreflight": true
+}
