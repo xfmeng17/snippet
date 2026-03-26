@@ -1,8 +1,8 @@
 # snippet
 
-学习业内知名 C++ 技术库的代码片段仓库。
+个人技术学习仓库：代码片段 + 技术调研文档。
 
-不是简化版，不是玩具 demo——目标是**同等完整度下更可读、代码规范更清晰的重写**。读代码就能学会原库的核心工程决策。
+代码片段不是简化版，不是玩具 demo——目标是**同等完整度下更可读、代码规范更清晰的重写**。读代码就能学会原库的核心工程决策。
 
 ## 学习方法
 
@@ -13,9 +13,10 @@
 
 ## 项目列表
 
-| 目录 | 来源 | 主题 | 构建 |
+| 目录 | 类型 | 主题 | 说明 |
 |------|------|------|------|
-| [brpc_lalb](brpc_lalb/) | [Apache brpc](https://github.com/apache/brpc) | Locality-Aware Load Balancing | Bazel, C++17 |
+| [brpc_lalb](brpc_lalb/) | 代码重写 | Locality-Aware Load Balancing | 源自 [Apache brpc](https://github.com/apache/brpc)，Bazel, C++17 |
+| [zenmux](zenmux/) | 技术调研 | ZenMux LLM API 代理商 | 收费方式详解（订阅 Flow 机制、PAYG、Claude API 计费对比） |
 
 ## brpc_lalb
 
