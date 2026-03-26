@@ -1,6 +1,9 @@
 #include "lalb/weight_tree.h"
 
+#include <memory>
 #include <random>
+#include <unordered_map>
+#include <utility>
 
 namespace lalb {
 
@@ -8,8 +11,10 @@ namespace lalb {
 // 线程局部随机数生成器
 // ============================================================
 static int64_t FastRandLessThan(int64_t range) {
-  if (range <= 0) return 0;
-  thread_local std::mt19937_64 rng(std::random_device{}());
+  if (range <= 0) {
+    return 0;
+  }
+  static thread_local std::mt19937_64 rng(std::random_device{}());  // NOLINT(whitespace/braces)
   return std::uniform_int_distribution<int64_t>(0, range - 1)(rng);
 }
 
@@ -32,8 +37,7 @@ void Servers::UpdateParentWeights(int64_t diff, size_t index) const {
     size_t parent = (index - 1) >> 1;
     if ((parent << 1) + 1 == index) {
       // index 是左子节点 → 更新父节点的 left_weight
-      weight_tree[parent].left_weight->fetch_add(diff,
-                                                 std::memory_order_relaxed);
+      weight_tree[parent].left_weight->fetch_add(diff, std::memory_order_relaxed);
     }
     index = parent;
   }
@@ -68,14 +72,13 @@ void WeightTree::PopLeft() { left_weights_.pop_back(); }
 // 因为 Weight 对象很重（有互斥锁、循环队列等），不能创建两份。
 // 通过检查 fg 中是否已有 id，第二次调用可以直接复制指针。
 // ============================================================
-bool WeightTree::Add(Servers& bg, const Servers& fg, uint64_t server_id,
-                     WeightTree* self, int64_t* out_weight) {
+bool WeightTree::Add(Servers& bg, const Servers& fg, uint64_t server_id, WeightTree* self,
+                     int64_t* out_weight) {
   if (bg.server_map.count(server_id)) {
     return false;  // 重复
   }
 
-  std::unordered_map<uint64_t, size_t>::const_iterator fg_it =
-      fg.server_map.find(server_id);
+  std::unordered_map<uint64_t, size_t>::const_iterator fg_it = fg.server_map.find(server_id);
 
   if (fg_it == fg.server_map.end()) {
     // ---- 第一次调用：创建新节点 ----
@@ -152,10 +155,65 @@ bool WeightTree::Add(Servers& bg, const Servers& fg, uint64_t server_id,
 //   6. 更新 total_weight: -old_weight
 //   7. 释放资源（被删节点的 Weight，末尾位置的 left_weight）
 // ============================================================
-bool WeightTree::Remove(Servers& bg, uint64_t server_id, WeightTree* self,
-                        int64_t* out_weight) {
-  std::unordered_map<uint64_t, size_t>::iterator it =
-      bg.server_map.find(server_id);
+// 删除末尾节点（简单情况）
+void WeightTree::RemoveTail(Servers& bg, size_t index, int64_t rm_weight, WeightTree* self) {
+  bg.weight_tree.pop_back();
+  if (rm_weight > 0) {
+    // 第一次修改：移除权值但不释放资源
+    // （前台可能还在通过 left_weight 指针访问末尾位置）
+    bg.UpdateParentWeights(-rm_weight, index);
+  } else {
+    // 第二次修改：释放资源
+    self->PopLeft();
+  }
+}
+
+// 搬移末尾节点到被删位置（复杂情况）
+void WeightTree::RemoveAndMove(Servers& bg, size_t index, int64_t rm_weight, WeightTree* self) {
+  // 搬移末尾节点到被删位置
+  // 注意：只搬 server_id 和 weight，left_weight 不动（和位置绑定）
+  bg.weight_tree[index].server_id = bg.weight_tree.back().server_id;
+  bg.weight_tree[index].weight = bg.weight_tree.back().weight;
+  bg.server_map[bg.weight_tree[index].server_id] = index;
+  bg.weight_tree.pop_back();
+
+  std::shared_ptr<Weight> w2 = bg.weight_tree[index].weight;  // 搬过来的
+
+  if (rm_weight > 0) {
+    // ---- 第一次修改（后台 buffer）----
+    // MarkOld: 记住搬移节点的当前权值和旧位置
+    int64_t add_weight = w2->MarkOld(bg.weight_tree.size());
+    // 在被删位置更新父节点：新权值 - 旧权值
+    int64_t diff = add_weight - rm_weight;
+    if (diff != 0) {
+      bg.UpdateParentWeights(diff, index);
+    }
+    return;
+  }
+
+  // ---- 第二次修改（新后台 = 原前台）----
+  // ClearOld: 获取两次修改之间的累积变化
+  std::pair<int64_t, int64_t> p = w2->ClearOld();
+  int64_t old_weight = p.first;
+  int64_t accumulated_diff = p.second;
+
+  // 1. 把累积的 diff 应用到被删位置的父节点
+  if (accumulated_diff != 0) {
+    bg.UpdateParentWeights(accumulated_diff, index);
+  }
+
+  // 2. 从末尾位置移除权值
+  int64_t remove_from_old = -(old_weight + accumulated_diff);
+  if (remove_from_old != 0) {
+    bg.UpdateParentWeights(remove_from_old, bg.weight_tree.size());
+  }
+
+  // 3. 释放资源
+  self->PopLeft();
+}
+
+bool WeightTree::Remove(Servers& bg, uint64_t server_id, WeightTree* self, int64_t* out_weight) {
+  std::unordered_map<uint64_t, size_t>::iterator it = bg.server_map.find(server_id);
   if (it == bg.server_map.end()) {
     return false;
   }
@@ -163,74 +221,15 @@ bool WeightTree::Remove(Servers& bg, uint64_t server_id, WeightTree* self,
   size_t index = it->second;
   bg.server_map.erase(it);
 
-  std::shared_ptr<Weight> w = bg.weight_tree[index].weight;
-  int64_t rm_weight = w->Disable();
-
-  // 第一次调用时记录被移除节点的权值
+  int64_t rm_weight = bg.weight_tree[index].weight->Disable();
   if (rm_weight > 0) {
     *out_weight = rm_weight;
   }
 
   if (index + 1 == bg.weight_tree.size()) {
-    // ---- 简单情况：删除末尾节点 ----
-    bg.weight_tree.pop_back();
-    if (rm_weight > 0) {
-      // 第一次修改：移除权值但不释放资源
-      // （前台可能还在通过 left_weight 指针访问末尾位置）
-      bg.UpdateParentWeights(-rm_weight, index);
-    } else {
-      // 第二次修改：释放资源
-      self->PopLeft();
-    }
+    RemoveTail(bg, index, rm_weight, self);
   } else {
-    // ---- 复杂情况：删除非末尾节点，需要搬移 ----
-
-    // 搬移末尾节点到被删位置
-    // 注意：只搬 server_id 和 weight，left_weight 不动（和位置绑定）
-    bg.weight_tree[index].server_id = bg.weight_tree.back().server_id;
-    bg.weight_tree[index].weight = bg.weight_tree.back().weight;
-    bg.server_map[bg.weight_tree[index].server_id] = index;
-    bg.weight_tree.pop_back();
-
-    std::shared_ptr<Weight> w2 = bg.weight_tree[index].weight;  // 搬过来的
-
-    if (rm_weight > 0) {
-      // ---- 第一次修改（后台 buffer）----
-
-      // MarkOld: 记住搬移节点的当前权值和旧位置
-      // bg.weight_tree.size() 就是搬移前的末尾索引（已 pop_back）
-      int64_t add_weight = w2->MarkOld(bg.weight_tree.size());
-
-      // 在被删位置更新父节点：新权值 - 旧权值
-      // 不动末尾位置的父节点（前台还在用）
-      int64_t diff = add_weight - rm_weight;
-      if (diff != 0) {
-        bg.UpdateParentWeights(diff, index);
-      }
-    } else {
-      // ---- 第二次修改（新后台 = 原前台）----
-
-      // ClearOld: 获取两次修改之间的累积变化
-      std::pair<int64_t, int64_t> p = w2->ClearOld();
-      int64_t old_weight = p.first;
-      int64_t accumulated_diff = p.second;
-
-      // 1. 把累积的 diff 应用到被删位置的父节点
-      if (accumulated_diff != 0) {
-        bg.UpdateParentWeights(accumulated_diff, index);
-      }
-
-      // 2. 从末尾位置移除权值
-      //    末尾位置的实际权值 = old_weight + accumulated_diff
-      //    需要移除的量 = -(old_weight + accumulated_diff)
-      int64_t remove_from_old = -(old_weight + accumulated_diff);
-      if (remove_from_old != 0) {
-        bg.UpdateParentWeights(remove_from_old, bg.weight_tree.size());
-      }
-
-      // 3. 释放资源
-      self->PopLeft();
-    }
+    RemoveAndMove(bg, index, rm_weight, self);
   }
   return true;
 }
@@ -242,8 +241,7 @@ bool WeightTree::Remove(Servers& bg, uint64_t server_id, WeightTree* self,
 int64_t WeightTree::AddServer(uint64_t server_id) {
   int64_t assigned_weight = 0;
   bool ok = db_servers_.ModifyWithForeground(
-      [server_id, this, &assigned_weight](Servers& bg,
-                                          const Servers& fg) -> bool {
+      [server_id, this, &assigned_weight](Servers& bg, const Servers& fg) -> bool {
         return Add(bg, fg, server_id, this, &assigned_weight);
       });
   return ok ? assigned_weight : 0;
@@ -251,10 +249,9 @@ int64_t WeightTree::AddServer(uint64_t server_id) {
 
 int64_t WeightTree::RemoveServer(uint64_t server_id) {
   int64_t removed_weight = 0;
-  bool ok = db_servers_.Modify(
-      [server_id, this, &removed_weight](Servers& bg) -> bool {
-        return Remove(bg, server_id, this, &removed_weight);
-      });
+  bool ok = db_servers_.Modify([server_id, this, &removed_weight](Servers& bg) -> bool {
+    return Remove(bg, server_id, this, &removed_weight);
+  });
   return ok ? removed_weight : 0;
 }
 
@@ -281,8 +278,66 @@ int64_t WeightTree::RemoveServer(uint64_t server_id) {
 // - 这是故意的：追求一致性需要加锁，但 LALB 的设计哲学是"最终一致就够了"
 // - 偶尔的选择偏差会在后续 Feedback 中被纠正
 // ============================================================
-WeightTree::SelectResult WeightTree::Select(int64_t total_weight,
-                                            int64_t begin_time_us) {
+// 沿二叉树查找节点，尝试 AddInflight
+// 返回 true 表示选中了（结果在 out_result），false 表示未选中需要重试
+bool WeightTree::WalkAndTrySelect(const Servers& s, size_t n, int64_t total_weight,
+                                  int64_t begin_time_us, int64_t* accumulated_diff,
+                                  int64_t* total_weight_delta, SelectResult* out_result) {
+  int64_t dice = FastRandLessThan(total_weight);
+  size_t index = 0;
+
+  int max_steps = 10000;
+  while (index < n && --max_steps > 0) {
+    int64_t left = s.weight_tree[index].left_weight->load(std::memory_order_relaxed);
+    int64_t self = s.weight_tree[index].weight->volatile_value();
+
+    if (dice < left) {
+      index = index * 2 + 1;
+    } else if (dice >= left + self) {
+      dice -= (left + self);
+      index = index * 2 + 2;
+    } else {
+      // 命中节点，尝试 AddInflight
+      Weight::AddInflightResult r =
+          s.weight_tree[index].weight->AddInflight(begin_time_us, index, dice - left);
+      if (r.weight_diff != 0) {
+        s.UpdateParentWeights(r.weight_diff, index);
+        *accumulated_diff += r.weight_diff;
+        *total_weight_delta += r.weight_diff;
+      }
+      if (r.chosen) {
+        *out_result = {s.weight_tree[index].server_id, *accumulated_diff, true};
+        return true;
+      }
+      return false;  // 未选中，需要外层重试
+    }
+  }
+  if (max_steps <= 0) {
+    // 超过步数限制，终止外层循环
+    *out_result = {0, *accumulated_diff, false};
+    return true;
+  }
+  // 走到叶子外（dice 偏差），让外层重新 roll dice
+  return false;
+}
+
+// 随机兜底选择
+WeightTree::SelectResult WeightTree::FallbackSelect(const Servers& s, size_t n,
+                                                    int64_t begin_time_us,
+                                                    int64_t accumulated_diff) {
+  size_t idx = FastRandLessThan(n);
+  Weight::AddInflightResult r = s.weight_tree[idx].weight->AddInflight(begin_time_us, idx, 0);
+  if (r.weight_diff != 0) {
+    s.UpdateParentWeights(r.weight_diff, idx);
+    accumulated_diff += r.weight_diff;
+  }
+  if (r.chosen) {
+    return {s.weight_tree[idx].server_id, accumulated_diff, true};
+  }
+  return {0, accumulated_diff, false};
+}
+
+WeightTree::SelectResult WeightTree::Select(int64_t total_weight, int64_t begin_time_us) {
   DoublyBufferedData<Servers>::ScopedPtr s;
   if (db_servers_.Read(&s) != 0) {
     return {0, 0, false};
@@ -294,60 +349,20 @@ WeightTree::SelectResult WeightTree::Select(int64_t total_weight,
   }
 
   int64_t accumulated_diff = 0;
-
   for (size_t ntry = 0; ntry < n; ++ntry) {
     if (total_weight <= 0) {
       break;
     }
-    int64_t dice = FastRandLessThan(total_weight);
-    size_t index = 0;
-
-    int max_steps = 10000;
-    bool retry_outer = false;
-    while (index < n && --max_steps > 0) {
-      int64_t left =
-          s->weight_tree[index].left_weight->load(std::memory_order_relaxed);
-      int64_t self = s->weight_tree[index].weight->volatile_value();
-
-      if (dice < left) {
-        index = index * 2 + 1;
-      } else if (dice >= left + self) {
-        dice -= (left + self);
-        index = index * 2 + 2;
-      } else {
-        // 命中节点，尝试 AddInflight
-        Weight::AddInflightResult r =
-            s->weight_tree[index].weight->AddInflight(begin_time_us, index,
-                                                      dice - left);
-        if (r.weight_diff != 0) {
-          s->UpdateParentWeights(r.weight_diff, index);
-          accumulated_diff += r.weight_diff;
-          total_weight += r.weight_diff;
-        }
-        if (r.chosen) {
-          return {s->weight_tree[index].server_id, accumulated_diff, true};
-        }
-        retry_outer = true;
-        break;
-      }
+    int64_t tw_delta = 0;
+    SelectResult result = {};
+    if (WalkAndTrySelect(*s, n, total_weight, begin_time_us, &accumulated_diff, &tw_delta,
+                         &result)) {
+      return result;
     }
-    if (!retry_outer && max_steps <= 0) {
-      break;
-    }
+    total_weight += tw_delta;
   }
 
-  // 兜底：随机选一个
-  size_t idx = FastRandLessThan(n);
-  Weight::AddInflightResult r =
-      s->weight_tree[idx].weight->AddInflight(begin_time_us, idx, 0);
-  if (r.weight_diff != 0) {
-    s->UpdateParentWeights(r.weight_diff, idx);
-    accumulated_diff += r.weight_diff;
-  }
-  if (r.chosen) {
-    return {s->weight_tree[idx].server_id, accumulated_diff, true};
-  }
-  return {0, accumulated_diff, false};
+  return FallbackSelect(*s, n, begin_time_us, accumulated_diff);
 }
 
 // ============================================================
@@ -357,21 +372,18 @@ WeightTree::SelectResult WeightTree::Select(int64_t total_weight,
 // Weight::Update 内部有自己的 mutex，保护统计数据。
 // diff 通过 atomic fetch_add 更新到 left_weight。
 // ============================================================
-int64_t WeightTree::Feedback(uint64_t server_id, int64_t latency_us,
-                             int64_t begin_time_us, bool error,
-                             int64_t timeout_ms) {
+int64_t WeightTree::Feedback(uint64_t server_id, int64_t latency_us, int64_t begin_time_us,
+                             bool error, int64_t timeout_ms) {
   DoublyBufferedData<Servers>::ScopedPtr s;
   if (db_servers_.Read(&s) != 0) {
     return 0;
   }
-  std::unordered_map<uint64_t, size_t>::const_iterator it =
-      s->server_map.find(server_id);
+  std::unordered_map<uint64_t, size_t>::const_iterator it = s->server_map.find(server_id);
   if (it == s->server_map.end()) {
     return 0;
   }
   size_t index = it->second;
-  int64_t diff = s->weight_tree[index].weight->Update(
-      begin_time_us, error, timeout_ms, index);
+  int64_t diff = s->weight_tree[index].weight->Update(begin_time_us, error, timeout_ms, index);
   if (diff != 0) {
     s->UpdateParentWeights(diff, index);
   }

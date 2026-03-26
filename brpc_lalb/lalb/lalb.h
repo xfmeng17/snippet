@@ -62,16 +62,14 @@ class LALB {
   // error: RPC 是否出错
   // timeout_ms: RPC 超时时间（毫秒），0 表示无超时限制。
   //             仅在 error=true 时生效，用于计算错误惩罚延时的下限。
-  void Feedback(uint64_t server_id, int64_t begin_time_us, int64_t latency_us,
-                bool error, int64_t timeout_ms = 0);
+  void Feedback(uint64_t server_id, int64_t begin_time_us, int64_t latency_us, bool error,
+                int64_t timeout_ms = 0);
 
   // 当前 server 数量。
   size_t Size() const { return tree_.Size(); }
 
   // 当前全局权值总和（用 relaxed 读取，可能短暂不一致，仅供监控/调试）。
-  int64_t TotalWeight() const {
-    return total_weight_.load(std::memory_order_relaxed);
-  }
+  int64_t TotalWeight() const { return total_weight_.load(std::memory_order_relaxed); }
 
  private:
   WeightTree tree_;

@@ -70,16 +70,14 @@ class Weight {
 
   // 反馈 RPC 结果，更新权值。返回权值变化量（diff）
   // index: 该 Weight 在 weight_tree 中的位置（用于 MarkOld 跟踪）
-  int64_t Update(int64_t begin_time_us, bool error, int64_t timeout_ms,
-                 size_t index);
+  int64_t Update(int64_t begin_time_us, bool error, int64_t timeout_ms, size_t index);
 
   // 选择 server 时调用：记录 inflight 并重算权值
   struct AddInflightResult {
     bool chosen;
     int64_t weight_diff;
   };
-  AddInflightResult AddInflight(int64_t begin_time_us, size_t index,
-                                int64_t dice);
+  AddInflightResult AddInflight(int64_t begin_time_us, size_t index, int64_t dice);
 
   // 标记节点失败，降低权值到平均值
   int64_t MarkFailed(size_t index, int64_t avg_weight);
@@ -114,6 +112,13 @@ class Weight {
   // now_us: 当前时间（微秒）
   // 返回权值变化量（new_weight - old_weight）
   int64_t ResetWeight(size_t index, int64_t now_us);
+
+  // 将正常/错误请求的延时采样入队
+  void EnqueueSample(int64_t latency, int64_t end_time_us, bool error, int64_t timeout_ms);
+
+  // 根据队列中的采样数据，计算 scaled_qps 和 avg_latency_
+  // 返回 false 表示数据不足，不需要更新权值
+  bool ComputeQpsAndLatency(int64_t end_time_us, int64_t* scaled_qps);
 
   // 当前有效权值（含 inflight 惩罚）
   // 用 volatile 防止编译器优化掉多线程下的读取

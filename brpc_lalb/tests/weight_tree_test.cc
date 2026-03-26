@@ -10,6 +10,8 @@
 #include <set>
 #include <thread>
 #include <unordered_map>
+#include <utility>
+#include <vector>
 
 #include "gtest/gtest.h"
 
@@ -18,9 +20,7 @@ namespace {
 
 static int64_t NowUs() {
   std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
-  return std::chrono::duration_cast<std::chrono::microseconds>(
-             now.time_since_epoch())
-      .count();
+  return std::chrono::duration_cast<std::chrono::microseconds>(now.time_since_epoch()).count();
 }
 
 // ============================================================
@@ -147,8 +147,8 @@ TEST(WeightTreeTest, SelectDistribution) {
   }
 
   for (const std::pair<const uint64_t, int>& kv : counts) {
-    EXPECT_GT(kv.second, n / 10)
-        << "Server " << kv.first << " selected too few times: " << kv.second;
+    EXPECT_GT(kv.second, n / 10) << "Server " << kv.first
+                                 << " selected too few times: " << kv.second;
   }
 }
 

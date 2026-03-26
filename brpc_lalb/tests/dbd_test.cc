@@ -9,8 +9,6 @@
 // 5. Per-instance TLS：多个 DoublyBufferedData 实例互不干扰
 // ============================================================
 
-#include "lalb/doubly_buffered_data.h"
-
 #include <atomic>
 #include <chrono>
 #include <functional>
@@ -19,6 +17,7 @@
 #include <vector>
 
 #include "gtest/gtest.h"
+#include "lalb/doubly_buffered_data.h"
 
 namespace lalb {
 namespace {

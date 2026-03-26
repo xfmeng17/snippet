@@ -108,9 +108,7 @@ class DoublyBufferedData {
     void EndRead() { mutex_.unlock(); }
 
     // 写线程调用：lock + unlock 确保该线程当前没有在读
-    void WaitReadDone() {
-      std::lock_guard<std::mutex> lock(mutex_);
-    }
+    void WaitReadDone() { std::lock_guard<std::mutex> lock(mutex_); }
 
    private:
     std::mutex mutex_;
@@ -191,9 +189,7 @@ class DoublyBufferedData {
   size_t WrapperCount() const;
 
  private:
-  const T* UnsafeRead() const {
-    return &data_[index_.load(std::memory_order_acquire)];
-  }
+  const T* UnsafeRead() const { return &data_[index_.load(std::memory_order_acquire)]; }
 
   // 获取或创建本线程对应本实例的 Wrapper
   Wrapper* GetOrCreateWrapper();
@@ -250,8 +246,7 @@ DoublyBufferedData<T>::~DoublyBufferedData() {
 }
 
 template <typename T>
-typename DoublyBufferedData<T>::Wrapper*
-DoublyBufferedData<T>::GetOrCreateWrapper() {
+typename DoublyBufferedData<T>::Wrapper* DoublyBufferedData<T>::GetOrCreateWrapper() {
   // ---- Per-Instance TLS 核心实现 ----
   //
   // brpc 用 WrapperTLSGroup：一个全局的 thread_local 数组池。
@@ -328,8 +323,7 @@ bool DoublyBufferedData<T>::Modify(std::function<bool(T&)> fn) {
 }
 
 template <typename T>
-bool DoublyBufferedData<T>::ModifyWithForeground(
-    std::function<bool(T& bg, const T& fg)> fn) {
+bool DoublyBufferedData<T>::ModifyWithForeground(std::function<bool(T& bg, const T& fg)> fn) {
   return Modify([this, &fn](T& bg) -> bool {
     const T& fg = data_[(&bg == &data_[0]) ? 1 : 0];
     return fn(bg, fg);
@@ -338,8 +332,7 @@ bool DoublyBufferedData<T>::ModifyWithForeground(
 
 template <typename T>
 size_t DoublyBufferedData<T>::WrapperCount() const {
-  std::lock_guard<std::mutex> lock(
-      const_cast<std::mutex&>(wrappers_mutex_));
+  std::lock_guard<std::mutex> lock(const_cast<std::mutex&>(wrappers_mutex_));
   size_t count = 0;
   for (size_t i = 0; i < wrappers_.size(); ++i) {
     if (!wrappers_[i].expired()) {

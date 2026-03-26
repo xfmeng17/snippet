@@ -116,8 +116,8 @@ class WeightTree {
   // 返回权值变化量（diff），调用方需将 diff 加到 total_weight 上。
   // server_id 不存在时返回 0（不报错，因为 Remove 可能在 RPC 期间发生）。
   // 线程安全：多线程可并发调用。
-  int64_t Feedback(uint64_t server_id, int64_t latency_us,
-                   int64_t begin_time_us, bool error, int64_t timeout_ms);
+  int64_t Feedback(uint64_t server_id, int64_t latency_us, int64_t begin_time_us, bool error,
+                   int64_t timeout_ms);
 
   size_t Size() const;
 
@@ -130,16 +130,31 @@ class WeightTree {
   // 第一次调用: fg 中没有 id → 创建新 Weight 和 left_weight
   // 第二次调用: fg 中有 id → 复制指针（不重复创建）
   // out_weight: 第一次调用时写入实际分配的初始权值
-  static bool Add(Servers& bg, const Servers& fg, uint64_t server_id,
-                  WeightTree* self, int64_t* out_weight);
+  static bool Add(Servers& bg, const Servers& fg, uint64_t server_id, WeightTree* self,
+                  int64_t* out_weight);
 
   // Remove: 不需要前台参考，但需要区分第一次/第二次
   // 通过 Weight::Disable() 的返回值区分：
   //   > 0: 第一次（后台）→ MarkOld
   //   = 0: 第二次（新后台）→ ClearOld + 清理资源
   // out_weight: 第一次调用时写入被移除节点的权值
-  static bool Remove(Servers& bg, uint64_t server_id, WeightTree* self,
-                     int64_t* out_weight);
+  static bool Remove(Servers& bg, uint64_t server_id, WeightTree* self, int64_t* out_weight);
+
+  // Remove 的子函数：删除末尾节点（简单情况）
+  static void RemoveTail(Servers& bg, size_t index, int64_t rm_weight, WeightTree* self);
+
+  // Remove 的子函数：搬移末尾节点到被删位置（复杂情况）
+  static void RemoveAndMove(Servers& bg, size_t index, int64_t rm_weight, WeightTree* self);
+
+  // Select 的子函数：沿二叉树查找节点，尝试 AddInflight
+  // 返回 true 表示找到了（结果通过 out_result 返回），false 表示需要重试
+  static bool WalkAndTrySelect(const Servers& s, size_t n, int64_t total_weight,
+                               int64_t begin_time_us, int64_t* accumulated_diff,
+                               int64_t* total_weight_delta, SelectResult* out_result);
+
+  // Select 的子函数：随机兜底选择
+  static SelectResult FallbackSelect(const Servers& s, size_t n, int64_t begin_time_us,
+                                     int64_t accumulated_diff);
 
   // ---- left_weight 管理 ----
   // 用 deque 保证指针稳定（vector resize 会导致指针失效）

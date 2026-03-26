@@ -9,6 +9,7 @@
 #include <functional>
 #include <thread>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "gtest/gtest.h"
@@ -138,7 +139,9 @@ TEST(LALBTest, PreferLowLatencyServer) {
   // 跑 300 轮，通过真实 sleep 产生不同延时
   for (int i = 0; i < 300; ++i) {
     LALB::SelectResult r = lb.Select();
-    if (!r.success) continue;
+    if (!r.success) {
+      continue;
+    }
     select_count[r.server_id]++;
 
     // 通过不同的 sleep 时间模拟不同延时
@@ -155,9 +158,8 @@ TEST(LALBTest, PreferLowLatencyServer) {
   int count2 = select_count[2];
 
   // server 1 (快) 应该获得更多流量
-  EXPECT_GT(count1, count2)
-      << "Fast server should get more traffic. "
-      << "count1=" << count1 << " count2=" << count2;
+  EXPECT_GT(count1, count2) << "Fast server should get more traffic. "
+                            << "count1=" << count1 << " count2=" << count2;
 }
 
 TEST(LALBTest, AdaptToLatencyChange) {
@@ -168,7 +170,9 @@ TEST(LALBTest, AdaptToLatencyChange) {
   // 阶段 1: server 1 快 (1ms), server 2 慢 (5ms)
   for (int i = 0; i < 200; ++i) {
     LALB::SelectResult r = lb.Select();
-    if (!r.success) continue;
+    if (!r.success) {
+      continue;
+    }
     int64_t latency = (r.server_id == 1) ? 1000 : 5000;
     std::this_thread::sleep_for(std::chrono::microseconds(50));
     lb.Feedback(r.server_id, r.begin_time_us, latency, false);
@@ -178,7 +182,9 @@ TEST(LALBTest, AdaptToLatencyChange) {
   std::unordered_map<uint64_t, int> phase2_count;
   for (int i = 0; i < 300; ++i) {
     LALB::SelectResult r = lb.Select();
-    if (!r.success) continue;
+    if (!r.success) {
+      continue;
+    }
     phase2_count[r.server_id]++;
     int64_t latency = (r.server_id == 1) ? 5000 : 1000;
     std::this_thread::sleep_for(std::chrono::microseconds(50));
@@ -187,8 +193,7 @@ TEST(LALBTest, AdaptToLatencyChange) {
 
   // 阶段 2 后半段，server 2 应该获得更多流量
   // 但由于需要时间适应，只验证 server 2 不是零
-  EXPECT_GT(phase2_count[2], 0)
-      << "Server 2 should receive traffic after latency reversal";
+  EXPECT_GT(phase2_count[2], 0) << "Server 2 should receive traffic after latency reversal";
 }
 
 // ============================================================
@@ -204,7 +209,9 @@ TEST(LALBTest, ErrorServerGetLessTraffic) {
 
   for (int i = 0; i < 300; ++i) {
     LALB::SelectResult r = lb.Select();
-    if (!r.success) continue;
+    if (!r.success) {
+      continue;
+    }
     counts[r.server_id]++;
 
     bool error = (r.server_id == 2);  // server 2 总是出错
@@ -214,9 +221,8 @@ TEST(LALBTest, ErrorServerGetLessTraffic) {
   }
 
   // server 1（正常）应该获得更多流量
-  EXPECT_GT(counts[1], counts[2])
-      << "Normal server should get more traffic than error server. "
-      << "count1=" << counts[1] << " count2=" << counts[2];
+  EXPECT_GT(counts[1], counts[2]) << "Normal server should get more traffic than error server. "
+                                  << "count1=" << counts[1] << " count2=" << counts[2];
 }
 
 // ============================================================
@@ -229,7 +235,7 @@ TEST(LALBTest, ManyServers) {
   for (int i = 1; i <= n; ++i) {
     lb.AddServer(i);
   }
-  EXPECT_EQ(lb.Size(), (size_t)n);
+  EXPECT_EQ(lb.Size(), static_cast<size_t>(n));
 
   // Select 应该能正常工作
   std::unordered_map<uint64_t, int> counts;
@@ -241,7 +247,7 @@ TEST(LALBTest, ManyServers) {
   }
 
   // 应该覆盖大部分 server
-  EXPECT_GT(counts.size(), (size_t)(n / 2))
+  EXPECT_GT(counts.size(), static_cast<size_t>(n / 2))
       << "Should cover most servers, got " << counts.size();
 }
 
@@ -281,8 +287,7 @@ TEST(LALBTest, ConcurrentSelectFeedback) {
     t.join();
   }
 
-  EXPECT_GT(total_ops.load(), 100)
-      << "Should complete significant number of operations";
+  EXPECT_GT(total_ops.load(), 100) << "Should complete significant number of operations";
 }
 
 // ============================================================
@@ -380,7 +385,9 @@ TEST(LALBTest, InflightDelayPunishment) {
   for (int i = 0; i < 100; ++i) {
     LALB::SelectResult r = lb.Select();
     if (r.success) {
-      if (r.server_id == 2) count2++;
+      if (r.server_id == 2) {
+        count2++;
+      }
       lb.Feedback(r.server_id, r.begin_time_us, 1000, false);
     }
   }
@@ -429,8 +436,7 @@ TEST(LALBTest, AllServersSameLatency) {
   // 相同延时，每个 server 都应该被访问到（最小权值保护确保了这一点）
   EXPECT_EQ(counts.size(), 3u) << "All 3 servers should receive some traffic";
   for (const std::pair<const uint64_t, int>& kv : counts) {
-    EXPECT_GT(kv.second, 0)
-        << "Server " << kv.first << " should get at least some traffic";
+    EXPECT_GT(kv.second, 0) << "Server " << kv.first << " should get at least some traffic";
   }
 }
 

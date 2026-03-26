@@ -7,6 +7,7 @@
 
 #include <chrono>
 #include <thread>
+#include <utility>
 
 #include "gtest/gtest.h"
 
@@ -15,9 +16,7 @@ namespace {
 
 static int64_t NowUs() {
   std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
-  return std::chrono::duration_cast<std::chrono::microseconds>(
-             now.time_since_epoch())
-      .count();
+  return std::chrono::duration_cast<std::chrono::microseconds>(now.time_since_epoch()).count();
 }
 
 // ============================================================
@@ -148,8 +147,9 @@ TEST(WeightTest, MultipleUpdatesConverge) {
   for (int i = 0; i < 200; ++i) {
     int64_t now = NowUs();
     Weight::AddInflightResult r = w.AddInflight(now, 0, 0);
-    if (!r.chosen) continue;
-
+    if (!r.chosen) {
+      continue;
+    }
     std::this_thread::sleep_for(std::chrono::microseconds(100));
     w.Update(now, false, 0, 0);
   }
@@ -190,8 +190,8 @@ TEST(WeightTest, MarkOldClearOldBasic) {
 
   // ClearOld: 没有权值变化，diff 应该为 0
   std::pair<int64_t, int64_t> p = w.ClearOld();
-  EXPECT_EQ(p.first, 5000);   // old_weight
-  EXPECT_EQ(p.second, 0);     // accumulated_diff
+  EXPECT_EQ(p.first, 5000);  // old_weight
+  EXPECT_EQ(p.second, 0);    // accumulated_diff
 }
 
 TEST(WeightTest, MarkOldTracksDiffAtOldIndex) {
@@ -235,7 +235,7 @@ TEST(WeightTest, MarkOldTracksDiffAtOldIndex) {
   // ClearOld: 应该能拿到累积的 diff
   std::pair<int64_t, int64_t> p = w.ClearOld();
   EXPECT_EQ(p.first, weight_before_mark);  // old_weight
-  EXPECT_EQ(p.second, expected_diff);       // accumulated_diff
+  EXPECT_EQ(p.second, expected_diff);      // accumulated_diff
 }
 
 TEST(WeightTest, MarkOldIgnoresDiffAtDifferentIndex) {
