@@ -1,65 +1,67 @@
+**English** | [中文](README_CN.md)
+
 # dev-init
 
-> **注意**: 这是个人开发环境配置的参考实现，包含作者特有的别名、工具链路径和 Provider 配置。
-> 直接使用前请根据自己的需求修改脚本内容。
+> **Note**: This is a reference implementation of a personal development environment setup, containing the author's specific aliases, toolchain paths, and provider configurations.
+> Please modify the script contents to suit your own needs before using.
 
-开发环境一键初始化 Claude Code Skill，支持 Docker Linux 和 macOS。
+A one-click development environment initialization Claude Code Skill, supporting Docker Linux and macOS.
 
-## 功能
+## Features
 
-- 安装基础依赖 (zsh, git, vim, cmake, clang-format, cpplint 等)
-- 安装 Oh My Zsh + 插件 (autosuggestions, syntax-highlighting)
-- 生成 `~/.zshrc` 和 `~/.profile`（分层设计）
-- 生成 Claude Code Provider 配置（API Key 使用占位符）
-- 设置 zsh 为默认 shell
+- Install base dependencies (zsh, git, vim, cmake, clang-format, cpplint, etc.)
+- Install Oh My Zsh + plugins (autosuggestions, syntax-highlighting)
+- Generate `~/.zshrc` and `~/.profile` (layered design)
+- Generate Claude Code provider configuration (API keys use placeholders)
+- Set zsh as the default shell
 
-## 安装
+## Installation
 
 ```bash
 cp -r dev-init ~/.claude/skills/
 ```
 
-## 使用
+## Usage
 
-### 通过 Claude Code
+### Via Claude Code
 
 ```
 /dev-init
 ```
 
-### 独立运行
+### Standalone
 
 ```bash
-bash scripts/init.sh --all       # 全部安装
-bash scripts/init.sh --deps      # 仅安装依赖
-bash scripts/init.sh --zsh       # 仅 Oh My Zsh + .zshrc
-bash scripts/init.sh --profile   # 仅 .profile
-bash scripts/init.sh --providers # 仅 Provider 配置
-bash scripts/init.sh --shell     # 仅切换默认 shell
+bash scripts/init.sh --all       # Install everything
+bash scripts/init.sh --deps      # Dependencies only
+bash scripts/init.sh --zsh       # Oh My Zsh + .zshrc only
+bash scripts/init.sh --profile   # .profile only
+bash scripts/init.sh --providers # Provider config only
+bash scripts/init.sh --shell     # Switch default shell only
 ```
 
-## 个性化要点
+## Personalization Notes
 
-以下内容是作者个人偏好，fork 后建议修改：
+The following items reflect the author's personal preferences. After forking, consider modifying:
 
-| 文件 | 需要改的内容 |
-|------|-------------|
-| `gen_zshrc.sh` | Oh My Zsh 主题 (`fletcherm`)、插件列表 |
-| `gen_profile.sh` | 别名 (`gs/gu/cl/c0/c1/c2/d1/d2`)、工具链路径、conda 环境名 |
-| `gen_providers.sh` | Provider 列表和 BASE_URL |
+| File | What to Change |
+|------|---------------|
+| `gen_zshrc.sh` | Oh My Zsh theme (`fletcherm`), plugin list |
+| `gen_profile.sh` | Aliases (`gs/gu/cl/c0/c1/c2/d1/d2`), toolchain paths, conda environment names |
+| `gen_providers.sh` | Provider list and BASE_URL |
 
-## 文件结构
+## File Structure
 
 ```
 dev-init/
 ├── SKILL.md
 └── scripts/
-    ├── init.sh              # 一键初始化入口
-    ├── detect_env.sh        # 环境检测
-    ├── install_deps.sh      # 安装基础依赖
-    ├── install_ohmyzsh.sh   # Oh My Zsh + 插件
-    ├── gen_zshrc.sh         # 生成 ~/.zshrc
-    ├── gen_profile.sh       # 生成 ~/.profile
-    ├── gen_providers.sh     # Claude Code Provider 配置
-    └── setup_shell.sh       # 设置默认 shell
+    ├── init.sh              # One-click initialization entry point
+    ├── detect_env.sh        # Environment detection
+    ├── install_deps.sh      # Install base dependencies
+    ├── install_ohmyzsh.sh   # Oh My Zsh + plugins
+    ├── gen_zshrc.sh         # Generate ~/.zshrc
+    ├── gen_profile.sh       # Generate ~/.profile
+    ├── gen_providers.sh     # Claude Code provider configuration
+    └── setup_shell.sh       # Set default shell
 ```

@@ -1,28 +1,30 @@
+**English** | [中文](README_CN.md)
+
 # gcp (Git Commit & Push)
 
-Google Conventional Commits 风格的 Git 提交 + 推送 Claude Code Skill。
+A Claude Code Skill for Git commit and push using the Conventional Commits format.
 
-## 功能
+## Features
 
-- 自动分析变更，生成 Conventional Commits 格式的 commit message
-- 逐个 `git add` 文件（不用 `git add .`）
-- 自动推送到远端
+- Automatically analyzes changes and generates Conventional Commits formatted commit messages
+- Adds files individually with `git add` (avoids `git add .`)
+- Automatically pushes to the remote
 
-## 安装
+## Installation
 
 ```bash
 cp -r gcp ~/.claude/skills/
 ```
 
-## 使用
+## Usage
 
-在 Claude Code 中：
+In Claude Code:
 
 ```
 /gcp
 ```
 
-## Commit 格式
+## Commit Format
 
 ```
 <type>(<scope>): <subject>
@@ -30,4 +32,4 @@ cp -r gcp ~/.claude/skills/
 <body>
 ```
 
-支持的 type: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `perf`
+Supported types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `perf`

@@ -1,57 +1,59 @@
+**English** | [中文](README_CN.md)
+
 # Claude Code Skills
 
-一组实用的 [Claude Code](https://docs.anthropic.com/en/docs/claude-code) 自定义 Skill，覆盖代码学习、C++ 风格检查、Git 提交和开发环境初始化。
+A collection of practical custom Skills for [Claude Code](https://docs.anthropic.com/en/docs/claude-code), covering code learning, C++ style checking, Git committing, and dev environment initialization.
 
-## Skills 一览
+## Skills Overview
 
-| Skill | 说明 | 通用性 |
-|-------|------|--------|
-| [learn-project](learn-project/) | 学习开源项目：源码笔记 / 分课时课程 / 手写 Mini 版 | 通用 |
-| [cpp-style-check](cpp-style-check/) | C++ 代码风格检查（Google Style + 认知复杂度 + 自定义规则） | 通用 |
-| [gcp](gcp/) | Google Conventional Commits 风格的 Git 提交 + 推送 | 通用 |
-| [dev-init](dev-init/) | 开发环境一键初始化（zsh + Oh My Zsh + Provider 配置） | 个人参考 |
+| Skill | Description | Generality |
+|-------|-------------|------------|
+| [learn-project](learn-project/) | Learn open-source projects: source notes / multi-lesson courses / hand-written Mini versions | General |
+| [cpp-style-check](cpp-style-check/) | C++ code style checking (Google Style + cognitive complexity + custom rules) | General |
+| [gcp](gcp/) | Git commit & push with Google Conventional Commits format | General |
+| [dev-init](dev-init/) | One-click dev environment initialization (zsh + Oh My Zsh + Provider config) | Personal reference |
 
-## 安装
+## Installation
 
-将需要的 skill 目录复制到 `~/.claude/skills/` 下即可：
+Copy the desired skill directories into `~/.claude/skills/`:
 
 ```bash
-# 安装单个 skill
+# Install a single skill
 cp -r learn-project ~/.claude/skills/
 
-# 安装全部
+# Install all
 cp -r learn-project cpp-style-check gcp dev-init ~/.claude/skills/
 ```
 
-## 什么是 Claude Code Skill
+## What Is a Claude Code Skill
 
-Skill 是 Claude Code 的自定义指令扩展。每个 skill 目录下有一个 `SKILL.md` 文件，定义了：
+A Skill is a custom instruction extension for Claude Code. Each skill directory contains a `SKILL.md` file that defines:
 
-- **触发条件**：什么时候激活（斜杠命令或自然语言）
-- **工作流程**：Claude 执行的具体步骤
-- **工具权限**：允许使用哪些工具（Bash、Read、Write 等）
+- **Trigger conditions**: When to activate (slash command or natural language)
+- **Workflow**: The specific steps Claude executes
+- **Tool permissions**: Which tools are allowed (Bash, Read, Write, etc.)
 
-详见 [Claude Code 文档](https://docs.anthropic.com/en/docs/claude-code)。
+See the [Claude Code documentation](https://docs.anthropic.com/en/docs/claude-code) for details.
 
-## 各 Skill 简介
+## Skill Descriptions
 
-### learn-project — 开源项目深度学习
+### learn-project — Deep Learning of Open-Source Projects
 
-三种模式帮你系统性地理解一个项目的 How、Why、Trade-off：
+Three modes to help you systematically understand a project's How, Why, and Trade-offs:
 
-- **notes**：按主题整理源码笔记
-- **course**：从零开始的分课时递进式课程（含 context 腐蚀防护机制）
-- **mini**：通过手写简化版来理解原项目
+- **notes**: Organize source code notes by topic
+- **course**: Progressive multi-lesson course from scratch (with context decay protection)
+- **mini**: Understand the original project by hand-writing a simplified version
 
 ```
 /learn-project course ~/project/leveldb
 ```
 
-### cpp-style-check — C++ 代码风格检查
+### cpp-style-check — C++ Code Style Checking
 
-四层检查：clang-format → cpplint → clang-tidy（认知复杂度） → 自定义规则。
+Four-layer checking: clang-format -> cpplint -> clang-tidy (cognitive complexity) -> custom rules.
 
-自定义规则包括：禁止异常、限制 auto、强制大括号、禁止抛异常的数值解析函数。
+Custom rules include: no exceptions, restricted `auto` usage, mandatory braces, no exception-throwing numeric parsing functions.
 
 ```
 /cpp-style-check src/my_module.cc
@@ -59,17 +61,17 @@ Skill 是 Claude Code 的自定义指令扩展。每个 skill 目录下有一个
 
 ### gcp — Git Commit & Push
 
-分析变更，自动生成 Conventional Commits 格式的 commit message 并推送。
+Analyzes changes and automatically generates a Conventional Commits formatted commit message, then pushes.
 
 ```
 /gcp
 ```
 
-### dev-init — 开发环境初始化
+### dev-init — Dev Environment Initialization
 
-> **注意**：这是个人配置的参考实现，使用前请根据自己的需求修改脚本。
+> **Note**: This is a personal configuration reference implementation. Please modify the scripts to suit your own needs before use.
 
-一键初始化 zsh 开发环境：依赖安装、Oh My Zsh、.zshrc/.profile 生成、Claude Code Provider 配置。
+One-click zsh dev environment initialization: dependency installation, Oh My Zsh, .zshrc/.profile generation, Claude Code Provider configuration.
 
 ```
 /dev-init

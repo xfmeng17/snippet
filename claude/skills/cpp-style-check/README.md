@@ -1,21 +1,23 @@
+**English** | [中文](README_CN.md)
+
 # cpp-style-check
 
-C++ 代码风格检查 Claude Code Skill，基于 Google C++ Style Guide。
+A C++ code style checking Claude Code Skill based on the Google C++ Style Guide.
 
-## 四层检查体系
+## Four-Layer Check System
 
-1. **clang-format** — 代码格式化
-2. **cpplint** — Google C++ Style Guide 规范
-3. **clang-tidy** — 认知复杂度检测
-4. **自定义规则** — 禁止异常、限制 auto、强制大括号、禁止抛异常的数值解析
+1. **clang-format** — Code formatting
+2. **cpplint** — Google C++ Style Guide compliance
+3. **clang-tidy** — Cognitive complexity detection
+4. **Custom Rules** — No exceptions, restrict auto, require braces, no throwing parsers
 
-## 安装
+## Installation
 
 ```bash
 cp -r cpp-style-check ~/.claude/skills/
 ```
 
-### 依赖
+### Dependencies
 
 ```bash
 # Ubuntu/Debian
@@ -26,39 +28,39 @@ pip install cpplint
 brew install llvm cpplint
 ```
 
-## 使用
+## Usage
 
-在 Claude Code 中：
+In Claude Code:
 
 ```
 /cpp-style-check src/my_module.cc
 ```
 
-或独立运行脚本：
+Or run scripts standalone:
 
 ```bash
-# 一键全检查
+# Full check
 python3 scripts/check_all.py src/ --complexity-threshold 15
 
-# 仅自定义规则
+# Custom rules only
 python3 scripts/check_custom_rules.py src/my_file.cc
 ```
 
-## 自定义规则说明
+## Custom Rules
 
-| 规则 | 级别 | 说明 |
-|------|------|------|
-| no-exceptions | ERROR | 禁止 try/catch/throw，用返回值报告错误 |
-| restrict-auto | WARNING | 仅允许 auto 用于迭代器和 lambda |
-| require-braces | WARNING | if/for/while/else 必须使用 {} |
-| no-throwing-parsers | ERROR | 禁止 std::stoi/stof 等，用 std::from_chars 替代 |
+| Rule | Level | Description |
+|------|-------|-------------|
+| no-exceptions | ERROR | Forbid try/catch/throw; use return values for error reporting |
+| restrict-auto | WARNING | Only allow auto for iterators and lambdas |
+| require-braces | WARNING | if/for/while/else must use {} |
+| no-throwing-parsers | ERROR | Forbid std::stoi/stof etc.; use std::from_chars instead |
 
-## 文件结构
+## File Structure
 
 ```
 cpp-style-check/
-├── SKILL.md                         # Skill 定义 + Google Style 速查
+├── SKILL.md                         # Skill definition + Google Style quick reference
 └── scripts/
-    ├── check_all.py                 # 一键全检查入口
-    └── check_custom_rules.py        # 自定义规则检查
+    ├── check_all.py                 # Full check entry point
+    └── check_custom_rules.py        # Custom rules checker
 ```

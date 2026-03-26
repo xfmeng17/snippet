@@ -1,46 +1,48 @@
+**English** | [中文](README_CN.md)
+
 # learn-project
 
-学习开源项目/代码库的通用 Claude Code Skill。
+A general-purpose Claude Code Skill for learning open-source projects and codebases.
 
-## 三种学习模式
+## Three Learning Modes
 
-| 模式 | 命令示例 | 产出 |
-|------|---------|------|
-| **notes** — 源码笔记 | `/learn-project notes ~/project/redis` | README + 分主题笔记 |
-| **course** — 分课时课程 | `/learn-project course ~/project/leveldb` | README + 分课时讲解文档 |
-| **mini** — 手写 Mini 版 | `/learn-project mini ~/project/sqlite ./nano-db` | TASK.md + 子任务 PRD + 架构文档 |
+| Mode | Command Example | Output |
+|------|----------------|--------|
+| **notes** — Source Code Notes | `/learn-project notes ~/project/redis` | README + topic-based notes |
+| **course** — Lesson-based Course | `/learn-project course ~/project/leveldb` | README + per-lesson documents |
+| **mini** — Build a Mini Version | `/learn-project mini ~/project/sqlite ./nano-db` | TASK.md + sub-task PRDs + architecture docs |
 
-## 安装
+## Installation
 
-将 `learn-project/` 目录复制到 `~/.claude/skills/` 下：
+Copy the `learn-project/` directory into `~/.claude/skills/`:
 
 ```bash
 cp -r learn-project ~/.claude/skills/
 ```
 
-## 使用
+## Usage
 
-在 Claude Code 中：
+In Claude Code:
 
 ```
 /learn-project course ~/project/leveldb
 ```
 
-或自然语言："帮我学习 LevelDB 的 SSTable 实现"
+Or use natural language: "Help me learn the SSTable implementation in LevelDB"
 
-## 特色
+## Highlights
 
-- **Context 腐蚀防护**：course 模式通过 `.course_log.md` 机制保持后半段课时质量
-- **踩坑记录**：内含从实际项目 Review 中总结的常见问题和修正方案
-- **三种模板**：notes/course/mini 各有详细的文档模板
+- **Context Decay Protection**: The course mode uses a `.course_log.md` mechanism to maintain quality in later lessons
+- **Pitfall Records**: Includes common issues and fixes summarized from real project reviews
+- **Three Templates**: Detailed document templates for notes/course/mini modes
 
-## 文件结构
+## File Structure
 
 ```
 learn-project/
-├── SKILL.md                        # Skill 定义
+├── SKILL.md                        # Skill definition
 └── references/
-    ├── template_notes.md           # 源码笔记模板
-    ├── template_course.md          # 课程讲解模板
-    └── template_mini.md            # 手写 Mini 版模板
+    ├── template_notes.md           # Source code notes template
+    ├── template_course.md          # Course lesson template
+    └── template_mini.md            # Mini version template
 ```

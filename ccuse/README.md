@@ -1,123 +1,126 @@
-# ccuse — Claude Code Provider 切换器
+# ccuse — Claude Code Provider Switcher
 
-一个 30 行 shell 函数，零依赖，秒级切换 Claude Code 的 API Provider。
+**English** | [中文](README_CN.md)
 
-## 为什么不用 cc-switch？
+A 30-line shell function to instantly switch Claude Code API providers. Zero dependencies.
 
-[cc-switch](https://github.com/nicholascelesworthy/cc-switch) 是目前业内比较流行的 Claude Code provider 切换方案，但我觉得它太重了：
+## Why not cc-switch?
+
+[cc-switch](https://github.com/nicholascelesworthy/cc-switch) is a popular Claude Code provider switching solution, but it's heavier than necessary:
 
 | | cc-switch | ccuse |
 |---|---|---|
-| 实现方式 | Node.js CLI，起一个本地代理端口 | 30 行 shell 函数 |
-| 依赖 | Node.js + npm install | 无（POSIX shell） |
-| 切换原理 | 本地 proxy 转发请求 | 直接替换 `settings.json` |
-| 运行时开销 | 常驻进程 + 端口监听 | 零（切完即走） |
-| 切换速度 | 需要重启代理 | 瞬间（一次 `cp`） |
+| Implementation | Node.js CLI, spawns a local proxy on a port | 30-line shell function |
+| Dependencies | Node.js + npm install | None (POSIX shell) |
+| Switching mechanism | Local proxy forwarding requests | Direct `settings.json` replacement |
+| Runtime overhead | Persistent process + port listener | Zero (fire and forget) |
+| Switch speed | Requires proxy restart | Instant (single `cp`) |
 
-**ccuse 的设计哲学：Claude Code 已经支持通过 `settings.json` 里的环境变量来配置 provider，那直接切文件就好了，不需要中间层。**
+**Design philosophy: Claude Code already supports provider configuration via environment variables in `settings.json` — just swap the file, no middleware needed.**
 
-## 原理
+## How it works
 
 ```
 ~/.claude/
-├── settings.json            # Claude Code 读取的配置（活跃配置）
-├── settings_zenmux.json     # Provider A 的完整配置
-├── settings_minimax.json    # Provider B 的完整配置
-└── settings_glm.json        # Provider C 的完整配置
+├── settings.json            # Active config (read by Claude Code)
+├── settings_zenmux.json     # Provider A config
+├── settings_minimax.json    # Provider B config
+└── settings_glm.json        # Provider C config
 ```
 
-- 每个 `settings_<name>.json` 是一份完整的 Claude Code 配置，包含该 provider 的 API key、base URL、模型名等
-- `ccuse <name>` 就是把 `settings_<name>.json` 复制为 `settings.json`
-- 每个配置文件的 `env` 中带 `CCUSE_PROVIDER` 字段标识自身名称，用于无参调用时显示当前 provider
+- Each `settings_<name>.json` is a complete Claude Code config with the provider's API key, base URL, model names, etc.
+- `ccuse <name>` copies `settings_<name>.json` to `settings.json`
+- Each config file contains a `CCUSE_PROVIDER` field in `env` to identify itself, used by the no-argument display
 
-## 安装
+## Installation
 
-把 `ccuse.sh` 中的函数复制到你的 `~/.profile`（或 `~/.bashrc` / `~/.zshrc`）中，然后 source 即可：
+Copy the function from `ccuse.sh` into your `~/.profile` (or `~/.bashrc` / `~/.zshrc`), then source it:
 
 ```bash
-# 方式一：直接 source（推荐）
+# Option 1: Append and source (recommended)
 cat ccuse.sh >> ~/.profile
 source ~/.profile
 
-# 方式二：或者在 shell 配置中 source 此文件
+# Option 2: Source the file directly
 echo 'source /path/to/ccuse.sh' >> ~/.profile
 source ~/.profile
 ```
 
-## 配置 Provider
+## Provider configuration
 
-为每个 provider 创建一个 `~/.claude/settings_<name>.json`，参考 `examples/` 目录下的示例。
+Create a `~/.claude/settings_<name>.json` for each provider. See `examples/` for references.
 
-关键字段说明：
+Key fields:
 
 ```jsonc
 {
   "env": {
-    "ANTHROPIC_AUTH_TOKEN": "your-api-key",      // API 密钥
-    "ANTHROPIC_BASE_URL": "https://xxx/anthropic", // Provider 的 API 端点
-    "ANTHROPIC_MODEL": "claude-opus-4-6",         // 默认模型
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "...",       // haiku 模型（/haiku 切换用）
-    "ANTHROPIC_DEFAULT_OPUS_MODEL": "...",        // opus 模型（/opus 切换用）
-    "ANTHROPIC_DEFAULT_SONNET_MODEL": "...",      // sonnet 模型（/sonnet 切换用）
-    "CCUSE_PROVIDER": "your-provider-name"        // ← 必须与文件名中的 <name> 一致
+    "ANTHROPIC_AUTH_TOKEN": "your-api-key",        // API key
+    "ANTHROPIC_BASE_URL": "https://xxx/anthropic",  // Provider endpoint
+    "ANTHROPIC_MODEL": "claude-opus-4-6",           // Default model
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "...",         // For /haiku switching
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "...",          // For /opus switching
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "...",        // For /sonnet switching
+    "CCUSE_PROVIDER": "your-provider-name"          // ← Must match <name> in filename
   },
-  "model": "claude-opus-4-6"                      // 与 ANTHROPIC_MODEL 保持一致
+  "model": "claude-opus-4-6"                        // Keep in sync with ANTHROPIC_MODEL
 }
 ```
 
-> **注意**：不同 provider 的模型 ID 可能不同。例如直连 Anthropic 用 `claude-opus-4-6`，而某些转发服务可能需要 `anthropic/claude-opus-4.6` 带前缀的格式。按照各 provider 的文档填写即可。
+> **Note**: Model IDs vary across providers. Direct Anthropic uses `claude-opus-4-6`, while some proxy services require prefixed formats like `anthropic/claude-opus-4.6`. Follow your provider's documentation.
 
-## 使用
+## Usage
 
 ```bash
-# 查看当前 provider 和可用列表
+# Show current provider and available list
 $ ccuse
-当前 provider: zenmux
+Current provider: zenmux
     "ANTHROPIC_BASE_URL": "https://zenmux.ai/api/anthropic",
     "ANTHROPIC_MODEL": "anthropic/claude-opus-4.6",
 
-可用 provider:
+Available providers:
   * zenmux         https://zenmux.ai/api/anthropic
     minimax        https://api.minimaxi.com/anthropic
     glm            https://open.bigmodel.cn/anthropic
 
-# 切换到 minimax
+# Switch to minimax
 $ ccuse minimax
-已切换到: minimax
+Switched to: minimax
     "ANTHROPIC_BASE_URL": "https://api.minimaxi.com/anthropic",
     "ANTHROPIC_MODEL": "MiniMax-M2.7",
 
-# 切换到不存在的 provider 会报错并列出可用项
+# Non-existent provider shows error and lists available ones
 $ ccuse foo
-找不到配置: /home/user/.claude/settings_foo.json
-当前 provider: minimax
+Config not found: /home/user/.claude/settings_foo.json
+Current provider: minimax
 ...
 ```
 
-切换后，新启动的 `claude` 会话即使用新 provider。已运行的会话不受影响。
+After switching, new `claude` sessions use the new provider. Running sessions are unaffected.
 
-## 文件结构
+## File structure
 
 ```
 ccuse/
-├── README.md              # 本文档
-├── ccuse.sh               # ccuse 函数源码，复制到 shell 配置中使用
+├── README.md              # English documentation
+├── README_CN.md           # Chinese documentation
+├── ccuse.sh               # Source code — copy into your shell config
 └── examples/
-    ├── settings_zenmux.json    # ZenMux provider 示例
-    ├── settings_minimax.json   # MiniMax provider 示例
-    └── settings_glm.json       # GLM-4 provider 示例
+    ├── settings_zenmux.json
+    ├── settings_minimax.json
+    └── settings_glm.json
 ```
 
 ## FAQ
 
-**Q: 切换后已有的 claude 会话会受影响吗？**
-A: 不会。`settings.json` 只在 claude 启动时读取，已运行的会话使用的是启动时加载的配置。
+**Q: Does switching affect running claude sessions?**
+A: No. `settings.json` is only read at startup. Running sessions keep their original config.
 
-**Q: 我的 settings.json 里有额外字段（如 `enabledPlugins`），切换会丢失吗？**
-A: 会。ccuse 是整文件替换。建议把所有需要的字段都写进每个 `settings_<name>.json` 中。
+**Q: Will extra fields in settings.json (e.g. `enabledPlugins`) be lost?**
+A: Yes. ccuse does a full file replacement. Include all needed fields in each `settings_<name>.json`.
 
-**Q: 支持 bash 吗？**
-A: 支持。ccuse 使用 POSIX 兼容的 shell 语法（`local` 除外，但几乎所有主流 shell 都支持 `local`）。在 bash / zsh / dash 等 shell 中均可使用。
+**Q: Does it work with bash?**
+A: Yes. ccuse uses POSIX-compatible shell syntax (`local` is the only exception, but virtually all mainstream shells support it). Works in bash / zsh / dash.
 
 ## License
 
