@@ -9,6 +9,7 @@
 | Skill | 说明 | 通用性 |
 |-------|------|--------|
 | [learn-project](learn-project/) | 学习开源项目：源码笔记 / 分课时课程 / 手写 Mini 版 | 通用 |
+| [learn-vec](learn-vec/) | 学习向量检索/ANN 算法：课程 / 手写 mini / 源码笔记 / 水平诊断 / 教学互动（主动回忆、费曼技巧） | 领域专用 |
 | [cpp-style-check](cpp-style-check/) | C++ 代码风格检查（Google Style + 认知复杂度 + 自定义规则） | 通用 |
 | [gcp](gcp/) | Google Conventional Commits 风格的 Git 提交 + 推送 | 通用 |
 | [dev-init](dev-init/) | 开发环境一键初始化（zsh + Oh My Zsh + Provider 配置） | 个人参考 |
@@ -22,7 +23,7 @@
 cp -r learn-project ~/.claude/skills/
 
 # 安装全部
-cp -r learn-project cpp-style-check gcp dev-init ~/.claude/skills/
+cp -r learn-project learn-vec cpp-style-check gcp dev-init ~/.claude/skills/
 ```
 
 ## 什么是 Claude Code Skill
@@ -47,6 +48,25 @@ Skill 是 Claude Code 的自定义指令扩展。每个 skill 目录下有一个
 
 ```
 /learn-project course ~/project/leveldb
+```
+
+### learn-vec — 向量检索/ANN 算法深度学习
+
+learn-project 的向量检索领域专用扩展。五种模式：
+
+- **course**：系统性分课时课程（含 context 腐蚀防护）
+- **mini**：从零手写简化版 ANN 实现
+- **notes**：整理向量检索库的源码笔记
+- **diagnose**：5 题水平诊断（L0–L3），自动调整课程难度
+- **quiz / explain**：主动回忆测试 + 费曼技巧讲解
+
+内置领域知识：算法族谱、常见误区、Benchmark 方法论、标准数据集。
+
+```
+/learn-vec course ~/project/hnswlib ./hnsw_learn/
+/learn-vec diagnose
+/learn-vec quiz hnsw-search
+/learn-vec explain "乘积量化"
 ```
 
 ### cpp-style-check — C++ 代码风格检查

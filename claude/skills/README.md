@@ -9,6 +9,7 @@ A collection of practical custom Skills for [Claude Code](https://docs.anthropic
 | Skill | Description | Generality |
 |-------|-------------|------------|
 | [learn-project](learn-project/) | Learn open-source projects: source notes / multi-lesson courses / hand-written Mini versions | General |
+| [learn-vec](learn-vec/) | Learn vector search / ANN algorithms: course / mini / notes / level diagnosis / pedagogy (Active Recall, Feynman) | Domain-specific |
 | [cpp-style-check](cpp-style-check/) | C++ code style checking (Google Style + cognitive complexity + custom rules) | General |
 | [gcp](gcp/) | Git commit & push with Google Conventional Commits format | General |
 | [dev-init](dev-init/) | One-click dev environment initialization (zsh + Oh My Zsh + Provider config) | Personal reference |
@@ -22,7 +23,7 @@ Copy the desired skill directories into `~/.claude/skills/`:
 cp -r learn-project ~/.claude/skills/
 
 # Install all
-cp -r learn-project cpp-style-check gcp dev-init ~/.claude/skills/
+cp -r learn-project learn-vec cpp-style-check gcp dev-init ~/.claude/skills/
 ```
 
 ## What Is a Claude Code Skill
@@ -47,6 +48,25 @@ Three modes to help you systematically understand a project's How, Why, and Trad
 
 ```
 /learn-project course ~/project/leveldb
+```
+
+### learn-vec — Vector Search / ANN Algorithm Learning
+
+A domain-specific extension of learn-project for vector search engines and ANN algorithms. Five modes:
+
+- **course**: Systematic multi-lesson course (with context decay protection)
+- **mini**: Hand-write a simplified ANN implementation from scratch
+- **notes**: Organize source code notes for a vector search library
+- **diagnose**: 5-question level diagnosis (L0–L3), auto-adjusts course difficulty
+- **quiz / explain**: Active Recall quizzes and Feynman Technique explanations
+
+Built-in domain knowledge: algorithm taxonomy, common misconceptions, benchmark methodology, standard datasets.
+
+```
+/learn-vec course ~/project/hnswlib ./hnsw_learn/
+/learn-vec diagnose
+/learn-vec quiz hnsw-search
+/learn-vec explain "product quantization"
 ```
 
 ### cpp-style-check — C++ Code Style Checking
