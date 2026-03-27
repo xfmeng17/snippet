@@ -1,7 +1,7 @@
 ---
 name: learn-project
 version: "1.1.0"
-description: 学习开源项目/代码库的通用技能。支持三种模式：源码笔记(notes)、分课时讲解课程(course)、从零手写 mini 版(mini)。当用户说"学习 XX 项目"、"整理 XX 源码"、"learn-project"时触发。
+description: 学习开源项目/代码库的通用技能。支持三种模式：源码笔记(notes)、分课时讲解课程(course)、从零手写 mini 版(mini)。当用户说"学习 XX 项目"、"整理 XX 源码"、"learn-project"时触发。支持 "/learn-project export/导出" 和 "/learn-project import/导入"。
 ---
 
 # Learn Project - 开源项目深度学习技能
@@ -275,3 +275,50 @@ description: 学习开源项目/代码库的通用技能。支持三种模式：
 - 生成课时大纲后，评估每课的信息密度是否均匀
 - 如果某个主题确实不需要深入，明确标注为"概览"并在 README 中说明
 - 对比类课时（如 NSW vs O-Descent）双方应达到相近的深度
+
+## 导出/导入（跨机器迁移 skill 本身）
+
+### 导出 (`/learn-project export` 或 `/learn-project 导出`)
+
+将整个 skill 打包为一个 `.md` 文件，输出到**当前工作目录**，方便拷贝到其他机器。
+
+**导出格式**: `learn-project_export.md`，内容结构如下：
+```markdown
+# learn-project skill export
+<!-- version: 1.1.0 -->
+<!-- exported: {timestamp} -->
+
+## FILE: SKILL.md
+（SKILL.md 完整内容）
+
+## FILE: references/template_notes.md
+（完整内容）
+
+## FILE: references/template_course.md
+（完整内容）
+
+## FILE: references/template_mini.md
+（完整内容）
+```
+
+**执行步骤**:
+1. 用 Glob 列出 `~/.claude/skills/learn-project/` 下所有文件（排除空目录）
+2. 用 Read 读取每个文件内容，从 SKILL.md frontmatter 提取 `version` 字段
+3. 按上述格式拼接（将版本号写入 `<!-- version: x.y.z -->` 头），用 Write 输出到 `{CWD}/learn-project_export.md`
+4. 告知用户输出路径和版本号
+
+### 导入 (`/learn-project import` 或 `/learn-project 导入`)
+
+从当前目录的 `.md` 文件恢复 skill 到 `~/.claude/skills/learn-project/`。
+
+**执行步骤**:
+1. 在当前目录查找导入文件。优先找 `learn-project_export.md`；若不存在，列出当前目录的 `.md` 文件让用户选择
+2. 用 Read 读取该 `.md` 文件
+3. 解析 `<!-- version: x.y.z -->` 获取导入版本，与当前 SKILL.md frontmatter 中的 version 比较
+   - 导入版本更新 → 继续导入
+   - 导入版本相同 → 提示用户版本相同，确认是否覆盖
+   - 导入版本更旧 → 警告用户当前版本更新，确认是否降级
+4. 解析每个 `## FILE: <相对路径>` 区块，提取代码块中的文件内容
+5. **备份**已有的 `~/.claude/skills/learn-project/` 目录（重命名为 `learn-project.bak.时间戳`）
+6. 用 Write 将每个文件写入 `~/.claude/skills/learn-project/<相对路径>`
+7. 告知用户恢复结果（包含版本号变化信息）
